@@ -9,3 +9,4 @@
 from .preprocess import preprocess_input, postprocess_output
 from .time_pipeline import LibrosaSilenceRemovalPipeline
 from .freq_pipeline import LibrosaMelSpecPatchesPipeline
+from .gsc_pipeline import GSCWaveformPipeline

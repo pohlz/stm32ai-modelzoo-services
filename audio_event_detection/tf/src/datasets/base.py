@@ -332,6 +332,131 @@ class BaseAEDTFDataset:
             return ds, np.array(clip_labels)
         else:
             return ds
+
+    def get_gsc_ds(self,
+                   audio_path: str,
+                   used_classes: List[str],
+                   batch_size: int,
+                   to_cache: bool,
+                   shuffle: bool,
+                   return_clip_labels: bool,
+                   split_name: str,
+                   df=None):
+        """Build a lazy GSC dataset with per-iteration waveform augmentation.
+
+        Unlike :meth:`get_ds`, this method keeps file paths in the TensorFlow
+        dataset and performs waveform preprocessing and feature extraction from
+        ``Dataset.map``. Consequently, training placement, shift, and noise are
+        sampled again on every epoch. Deterministic splits may be cached.
+        """
+        if df is None or df.empty:
+            raise ValueError(f"GSC split {split_name!r} is empty")
+        if self.use_garbage_class:
+            raise ValueError(
+                "GSC uses explicit 'unknown' and 'silence' classes; "
+                "dataset.use_garbage_class must be False"
+            )
+
+        dataframe = df.copy()
+        dataframe["filename"] = dataframe["filename"].astype(str)
+        available_classes = set(dataframe["category"].unique())
+        missing_classes = set(used_classes) - available_classes
+        if missing_classes:
+            raise ValueError(
+                f"Classes missing from GSC {split_name} CSV: {sorted(missing_classes)}"
+            )
+
+        dataframe = dataframe[dataframe["category"].isin(used_classes)].reset_index(drop=True)
+        self.time_pipeline.validate_silence_sources(dataframe, split_name)
+
+        class_names = sorted(used_classes)
+        class_to_index = {name: index for index, name in enumerate(class_names)}
+        paths = []
+        label_indices = []
+        label_names = []
+        extension = str(self.file_extension)
+
+        for row in dataframe.itertuples(index=False):
+            filename = str(row.filename)
+            if extension and not filename.lower().endswith(extension.lower()):
+                filename += extension
+            filepath = Path(audio_path, filename)
+            if not filepath.is_file():
+                raise FileNotFoundError(f"GSC audio file not found: {filepath}")
+            paths.append(str(filepath))
+            label_indices.append(class_to_index[row.category])
+            label_names.append(str(row.category))
+
+        training = split_name == "training"
+        ds = tf.data.Dataset.from_tensor_slices(
+            (paths, np.asarray(label_indices, dtype=np.int32), label_names)
+        )
+        if training and shuffle:
+            ds = ds.shuffle(
+                buffer_size=len(paths),
+                seed=self.seed,
+                reshuffle_each_iteration=True,
+            )
+
+        feature_shape = (
+            self.freq_pipeline.n_mels,
+            self.freq_pipeline.patch_length,
+        )
+        if self.expand_last_dim:
+            feature_shape += (1,)
+
+        def _decode_string(value):
+            value = np.asarray(value).item()
+            return value.decode("utf-8") if isinstance(value, bytes) else str(value)
+
+        def _load_and_preprocess(path, label_index, label_name):
+            decoded_path = _decode_string(path)
+            decoded_label = _decode_string(label_name)
+            wave, _ = librosa.load(decoded_path, sr=self.sr, mono=True)
+            wave = self.time_pipeline(
+                wave,
+                label=decoded_label,
+                training=training,
+            )
+            patches = self.freq_pipeline(wave)
+            if len(patches) != 1:
+                raise ValueError(
+                    "GSC preprocessing must produce exactly one feature patch; "
+                    f"received {len(patches)} from {decoded_path}"
+                )
+
+            feature = np.asarray(patches[0], dtype=np.float32)
+            if self.expand_last_dim:
+                feature = np.expand_dims(feature, axis=-1)
+
+            one_hot = np.zeros(len(class_names), dtype=np.float32)
+            one_hot[int(np.asarray(label_index).item())] = 1.0
+            return feature, one_hot
+
+        def _tf_map(path, label_index, label_name):
+            feature, label = tf.numpy_function(
+                _load_and_preprocess,
+                [path, label_index, label_name],
+                [tf.float32, tf.float32],
+            )
+            feature.set_shape(feature_shape)
+            label.set_shape((len(class_names),))
+            return feature, label
+
+        # One worker keeps the seeded NumPy generator deterministic and avoids
+        # concurrent access to Librosa from Python callbacks.
+        ds = ds.map(_tf_map, num_parallel_calls=1)
+        if to_cache and not training:
+            ds = ds.cache()
+        elif to_cache and training:
+            print("[INFO] : Ignoring dataset.to_cache for randomized GSC training data")
+        ds = ds.batch(batch_size)
+        ds = ds.prefetch(buffer_size=tf.data.AUTOTUNE)
+
+        if return_clip_labels:
+            # Fixed one-second inputs produce one patch per source clip.
+            return ds, np.arange(len(dataframe), dtype=np.int32)
+        return ds
         
     def get_ds_no_df(self,
                      audio_path: str,

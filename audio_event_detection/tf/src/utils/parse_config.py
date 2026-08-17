@@ -111,11 +111,46 @@ def _parse_dataset_specific_fsd50k_section(cfg: DictConfig) -> None:
 
 def _parse_preprocessing_section(cfg: DictConfig) -> None:
     # cfg: 'preprocessing' section of the configuration file
-    legal = ["min_length", "max_length", "target_rate",
-             "top_db", "frame_length", "hop_length",
+    legal = ["gsc_default", "target_rate", "sample_length", "random_position",
+             "time_shift_ms", "background_noise_path", "background_frequency",
+             "background_volume", "reserved_background_files",
+             "min_length", "max_length", "top_db", "frame_length", "hop_length",
              "trim_last_second", "lengthen"]
-    # All are required
-    check_config_attributes(cfg, specs={"legal": legal, "all": legal}, section="preprocessing")
+
+    if cfg.get("gsc_default", False):
+        required = ["gsc_default", "target_rate", "sample_length", "random_position",
+                    "time_shift_ms", "background_noise_path", "background_frequency",
+                    "background_volume", "reserved_background_files"]
+    else:
+        required = ["min_length", "max_length", "target_rate", "top_db",
+                    "frame_length", "hop_length", "trim_last_second", "lengthen"]
+
+    check_config_attributes(
+        cfg,
+        specs={"legal": legal, "all": required},
+        section="preprocessing"
+    )
+
+    if cfg.get("gsc_default", False):
+        if cfg.target_rate != 16000:
+            raise ValueError("GSC default preprocessing requires target_rate: 16000")
+        if cfg.sample_length <= 0:
+            raise ValueError("preprocessing.sample_length must be positive")
+        if cfg.time_shift_ms < 0:
+            raise ValueError("preprocessing.time_shift_ms must not be negative")
+        if not 0.0 <= cfg.background_frequency <= 1.0:
+            raise ValueError("preprocessing.background_frequency must be between 0 and 1")
+        if not 0.0 <= cfg.background_volume <= 1.0:
+            raise ValueError("preprocessing.background_volume must be between 0 and 1")
+        if not cfg.reserved_background_files:
+            raise ValueError(
+                "preprocessing.reserved_background_files must reserve at least one WAV"
+            )
+        if not os.path.isdir(cfg.background_noise_path):
+            raise FileNotFoundError(
+                "Unable to find preprocessing.background_noise_path: "
+                f"{cfg.background_noise_path}"
+            )
 
 def _parse_feature_extraction_section(cfg: DictConfig) -> None:
     # cfg: 'feature_extraction' section of the config file

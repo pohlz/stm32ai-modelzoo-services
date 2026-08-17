@@ -111,6 +111,7 @@ class CustomAEDTFDataset(BaseAEDTFDataset):
         
         self.class_names = class_names
         self.quantization_split = quantization_split
+        self.gsc_default = getattr(self.time_pipeline, "gsc_default", False)
 
     def get_tf_datasets(self,
                         batch_size: int,
@@ -174,30 +175,54 @@ class CustomAEDTFDataset(BaseAEDTFDataset):
 
             print("[INFO] : Loading training dataset")
 
-            train_ds = self.get_ds(
-                df=train_df,
-                audio_path=self.training_audio_path,
-                used_classes=used_classes,
-                batch_size=batch_size,
-                to_cache=to_cache,
-                shuffle=shuffle,
-                return_clip_labels=False,
-                return_arrays=False
+            if self.gsc_default:
+                train_ds = self.get_gsc_ds(
+                    df=train_df,
+                    audio_path=self.training_audio_path,
+                    used_classes=used_classes,
+                    batch_size=batch_size,
+                    to_cache=to_cache,
+                    shuffle=shuffle,
+                    return_clip_labels=False,
+                    split_name="training",
                 )
+            else:
+                train_ds = self.get_ds(
+                    df=train_df,
+                    audio_path=self.training_audio_path,
+                    used_classes=used_classes,
+                    batch_size=batch_size,
+                    to_cache=to_cache,
+                    shuffle=shuffle,
+                    return_clip_labels=False,
+                    return_arrays=False
+                    )
             
             # Use validation audio path if provided
             audio_path = self.validation_audio_path if self.validation_audio_path else self.training_audio_path
             print("[INFO] : Loading validation dataset")
-            val_ds, val_clip_labels = self.get_ds(
-                df=val_df,
-                audio_path=audio_path,
-                used_classes=used_classes,
-                batch_size=batch_size,
-                to_cache=to_cache,
-                shuffle=False,
-                return_clip_labels=True,
-                return_arrays=False
+            if self.gsc_default:
+                val_ds, val_clip_labels = self.get_gsc_ds(
+                    df=val_df,
+                    audio_path=audio_path,
+                    used_classes=used_classes,
+                    batch_size=batch_size,
+                    to_cache=to_cache,
+                    shuffle=False,
+                    return_clip_labels=True,
+                    split_name="validation",
                 )
+            else:
+                val_ds, val_clip_labels = self.get_ds(
+                    df=val_df,
+                    audio_path=audio_path,
+                    used_classes=used_classes,
+                    batch_size=batch_size,
+                    to_cache=to_cache,
+                    shuffle=False,
+                    return_clip_labels=True,
+                    return_arrays=False
+                    )
         else:
             train_ds = None
             val_ds = None
@@ -210,24 +235,48 @@ class CustomAEDTFDataset(BaseAEDTFDataset):
             else:
                 quant_class_names = self.class_names
 
-            quantization_ds = self.get_ds(
-                df=quant_df,
-                used_classes=quant_class_names,
-                audio_path=self.quantization_audio_path,
-                batch_size=batch_size,
-                to_cache=to_cache,
-                shuffle=False,
-                return_clip_labels=False,
-                return_arrays=False
+            if self.gsc_default:
+                quantization_ds = self.get_gsc_ds(
+                    df=quant_df,
+                    used_classes=quant_class_names,
+                    audio_path=self.quantization_audio_path,
+                    batch_size=batch_size,
+                    to_cache=to_cache,
+                    shuffle=False,
+                    return_clip_labels=False,
+                    split_name="quantization",
                 )
+            else:
+                quantization_ds = self.get_ds(
+                    df=quant_df,
+                    used_classes=quant_class_names,
+                    audio_path=self.quantization_audio_path,
+                    batch_size=batch_size,
+                    to_cache=to_cache,
+                    shuffle=False,
+                    return_clip_labels=False,
+                    return_arrays=False
+                    )
                 
         elif train_ds is not None:
-            quantization_ds = train_ds
+            if self.gsc_default:
+                quantization_ds = self.get_gsc_ds(
+                    df=train_df,
+                    used_classes=used_classes,
+                    audio_path=self.training_audio_path,
+                    batch_size=batch_size,
+                    to_cache=to_cache,
+                    shuffle=False,
+                    return_clip_labels=False,
+                    split_name="quantization",
+                )
+            else:
+                quantization_ds = train_ds
 
         else:
             quantization_ds = None
 
-        if quantization_ds:
+        if quantization_ds is not None:
             quantization_ds = quantization_ds.take(int(len(quantization_ds) * float(self.quantization_split)))
         
         if self.test_csv_path:
@@ -237,16 +286,28 @@ class CustomAEDTFDataset(BaseAEDTFDataset):
             else:
                 test_class_names = self.class_names
 
-            test_ds, test_clip_labels = self.get_ds(
-                df=test_df,
-                audio_path=self.test_audio_path,
-                used_classes=test_class_names,
-                batch_size=batch_size,
-                to_cache=to_cache,
-                shuffle=False,
-                return_clip_labels=True,
-                return_arrays=False
+            if self.gsc_default:
+                test_ds, test_clip_labels = self.get_gsc_ds(
+                    df=test_df,
+                    audio_path=self.test_audio_path,
+                    used_classes=test_class_names,
+                    batch_size=batch_size,
+                    to_cache=to_cache,
+                    shuffle=False,
+                    return_clip_labels=True,
+                    split_name="test",
                 )
+            else:
+                test_ds, test_clip_labels = self.get_ds(
+                    df=test_df,
+                    audio_path=self.test_audio_path,
+                    used_classes=test_class_names,
+                    batch_size=batch_size,
+                    to_cache=to_cache,
+                    shuffle=False,
+                    return_clip_labels=True,
+                    return_arrays=False
+                    )
         else:
             test_ds = None
             test_clip_labels = None

@@ -8,7 +8,11 @@
 #  *--------------------------------------------------------------------------------------------*/
 
 from omegaconf import DictConfig
-from audio_event_detection.tf.src.preprocessing import LibrosaMelSpecPatchesPipeline, LibrosaSilenceRemovalPipeline
+from audio_event_detection.tf.src.preprocessing import (
+    GSCWaveformPipeline,
+    LibrosaMelSpecPatchesPipeline,
+    LibrosaSilenceRemovalPipeline,
+)
 from math import floor
 
 def get_pipelines(cfg: DictConfig):
@@ -21,6 +25,20 @@ def get_pipelines(cfg: DictConfig):
 def _get_time_pipeline(cfg: DictConfig):
     ''' Grabs time domain preproc args from config and instantiates LibrosaSilenceRemovalPipeline'''
     preproc_section = cfg.preprocessing
+
+    if preproc_section.get("gsc_default", False):
+        return GSCWaveformPipeline(
+            sr=preproc_section.get("target_rate", 16000),
+            sample_length=preproc_section.get("sample_length", 1.0),
+            random_position=preproc_section.get("random_position", True),
+            time_shift_ms=preproc_section.get("time_shift_ms", 100),
+            background_noise_path=preproc_section.get("background_noise_path", None),
+            background_frequency=preproc_section.get("background_frequency", 0.8),
+            background_volume=preproc_section.get("background_volume", 0.1),
+            reserved_background_files=preproc_section.get("reserved_background_files", []),
+            seed=cfg.dataset.get("seed", 123),
+        )
+
     min_length = preproc_section.get("min_length", 1)
     max_length = preproc_section.get("max_length", 10)
     sr = preproc_section.get("target_rate", 16000)
