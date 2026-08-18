@@ -21,7 +21,7 @@ import logging
 
 from common.utils import log_to_file, log_last_epoch_history, LRTensorBoard, check_training_determinism, \
                          model_summary, collect_callback_args, vis_training_curves
-from common.training import get_optimizer, lr_schedulers
+from common.training import get_optimizer, lr_schedulers, set_all_layers_trainable_parameter
 from audio_event_detection.tf.src.utils import get_loss, AED_CUSTOM_OBJECTS
 from audio_event_detection.tf.src.data_augmentation import get_data_augmentation
 
@@ -303,6 +303,11 @@ class AEDTrainer:
 
         else: # If we're resuming training we don't need to reappend the data augmentation layers.
            self.augmented_model = self.model
+           # A model saved after head-only transfer learning retains the frozen
+           # state of its YAMNet backbone. Allow a second-stage resume config to
+           # explicitly unfreeze the complete loaded model before recompiling.
+           if self.cfg.training.fine_tune:
+               set_all_layers_trainable_parameter(self.augmented_model, trainable=True)
 
 
         # Compile the model with data augmentation layers added

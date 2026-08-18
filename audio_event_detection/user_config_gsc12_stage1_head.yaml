@@ -1,0 +1,38 @@
+# Stage 1: train the new GSC-12 classifier head with the pretrained YAMNet
+# backbone frozen. All unspecified settings are inherited from the current GSC
+# preprocessing/fine-tuning configuration.
+defaults:
+  - user_config_gsc12_gsc_preproc_ft
+  - _self_
+
+general:
+  project_name: gsc12_yamnet_head
+
+operation_mode: training
+
+training:
+  fine_tune: False
+  dropout: 0.2
+  batch_size: 32
+  epochs: 30
+  resume_training:
+  optimizer:
+    Adam:
+      learning_rate: 0.001
+  callbacks:
+    ReduceLROnPlateau:
+      monitor: val_loss
+      mode: min
+      factor: 0.5
+      patience: 3
+      min_lr: 1.0e-05
+    EarlyStopping:
+      monitor: val_loss
+      mode: min
+      restore_best_weights: true
+      patience: 6
+
+# A stable directory gives stage 2 a predictable checkpoint path.
+hydra:
+  run:
+    dir: ./tf/src/experiments_outputs/gsc12_stage1_head

@@ -1,0 +1,43 @@
+# Stage 2: resume from the best stage-1 augmented checkpoint, unfreeze the
+# complete YAMNet model, and fine-tune it with a much smaller learning rate.
+defaults:
+  - user_config_gsc12_gsc_preproc_ft
+  - _self_
+
+general:
+  project_name: gsc12_yamnet_finetune
+
+operation_mode: chain_tqe
+
+model:
+  model_name:
+  model_path: ./tf/src/experiments_outputs/gsc12_stage1_head/saved_models/best_augmented_model.keras
+  input_shape: (64, 96, 1)
+  pretrained:
+
+training:
+  fine_tune: True
+  # The loaded stage-1 model already contains its Dropout(0.2) layer.
+  dropout: 0.2
+  batch_size: 32
+  epochs: 40
+  resume_training: True
+  optimizer:
+    Adam:
+      learning_rate: 0.00005
+  callbacks:
+    ReduceLROnPlateau:
+      monitor: val_loss
+      mode: min
+      factor: 0.5
+      patience: 3
+      min_lr: 1.0e-07
+    EarlyStopping:
+      monitor: val_loss
+      mode: min
+      restore_best_weights: true
+      patience: 7
+
+hydra:
+  run:
+    dir: ./tf/src/experiments_outputs/gsc12_stage2_finetune
