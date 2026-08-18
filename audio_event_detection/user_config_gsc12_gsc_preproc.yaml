@@ -21,19 +21,19 @@ dataset:
   class_names: ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go', 'unknown', 'silence']
   file_extension: '.wav'
 
-  training_audio_path: /mnt/d/Rozpracovano/NeAIxt/KWD/datasets/speech_commands_v0.02
-  training_csv_path: /mnt/d/Rozpracovano/NeAIxt/KWD/datasets/speech_commands_v0.02/training.csv
+  training_audio_path: ../../datasets/speech_commands_v0.02
+  training_csv_path: ../../datasets/speech_commands_v0.02/training.csv
 
-  validation_audio_path: /mnt/d/Rozpracovano/NeAIxt/KWD/datasets/speech_commands_v0.02
-  validation_csv_path: /mnt/d/Rozpracovano/NeAIxt/KWD/datasets/speech_commands_v0.02/validation.csv
+  validation_audio_path: ../../datasets/speech_commands_v0.02
+  validation_csv_path: ../../datasets/speech_commands_v0.02/validation.csv
 
-  quantization_audio_path: /mnt/d/Rozpracovano/NeAIxt/KWD/datasets/speech_commands_v0.02
-  quantization_csv_path: /mnt/d/Rozpracovano/NeAIxt/KWD/datasets/speech_commands_v0.02/quantization.csv
+  quantization_audio_path: ../../datasets/speech_commands_v0.02
+  quantization_csv_path: ../../datasets/speech_commands_v0.02/quantization.csv
 
   test_audio_path: # Optional
   test_csv_path: # Optional
-  #test_audio_path: /mnt/d/Rozpracovano/NeAIxt/KWD/datasets/speech_commands_v0.02
-  #test_csv_path: /mnt/d/Rozpracovano/NeAIxt/KWD/datasets/speech_commands_v0.02/evaluation.csv
+  #test_audio_path: ../../datasets/speech_commands_v0.02
+  #test_csv_path: ../../datasets/speech_commands_v0.02/evaluation.csv
 
 
   multi_label: False 
@@ -50,7 +50,7 @@ preprocessing:
   sample_length: 1.0
   random_position: True
   time_shift_ms: 100
-  background_noise_path: /mnt/d/Rozpracovano/NeAIxt/KWD/datasets/speech_commands_v0.02/_background_noise_
+  background_noise_path: ../../datasets/speech_commands_v0.02/_background_noise_
   background_frequency: 0.8
   background_volume: 0.1
   # These WAVs are used only to generate validation/test silence and are
@@ -93,7 +93,7 @@ data_augmentation:
     mask_value : 0
 
 training:
-  fine_tune: False # Set to True if you want to fine-tune a pretrained model from the zoo
+  fine_tune: True # Set to True if you want to fine-tune a pretrained model from the zoo
   dropout: 0
   batch_size: 32
   epochs: 200
