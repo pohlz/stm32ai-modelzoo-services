@@ -1,0 +1,147 @@
+general:
+  project_name: myproject
+  logs_dir: logs
+  saved_models_dir: saved_models
+  global_seed: 120
+  gpu_memory_limit: 50
+  display_figures: True
+  deterministic_ops: False
+
+
+operation_mode: chain_tqe #chain_tqeb
+#choices=['training' , 'evaluation', 'prediction', 'deployment', 'quantization', 'benchmarking',
+#        'chain_tqeb','chain_tqe',' chain_eqe','chain_qb','chain_eqeb','chain_qd ']
+model: 
+  model_name: yamnet_e256
+  input_shape: (64, 96, 1)
+  pretrained: True # Set to True if you want to use pretrained weights provided in the model zoo
+                           # Yamnet-256 can only be used with pretrained weights.
+dataset:
+  dataset_name: custom
+  class_names: ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go', 'unknown', 'silence']
+  file_extension: '.wav'
+
+  training_audio_path: ../../datasets/speech_commands_v0.02
+  training_csv_path: ../../datasets/speech_commands_v0.02/training.csv
+
+  validation_audio_path: ../../datasets/speech_commands_v0.02
+  validation_csv_path: ../../datasets/speech_commands_v0.02/validation.csv
+
+  quantization_audio_path: ../../datasets/speech_commands_v0.02
+  quantization_csv_path: ../../datasets/speech_commands_v0.02/quantization.csv
+
+  test_audio_path: # Optional
+  test_csv_path: # Optional
+  #test_audio_path: ../../datasets/speech_commands_v0.02
+  #test_csv_path: ../../datasets/speech_commands_v0.02/evaluation.csv
+
+
+  multi_label: False 
+  use_garbage_class: False 
+  n_samples_per_garbage_class: 2
+  expand_last_dim: True
+  seed: 120 # Optional, there is a default seed
+  to_cache: True
+  shuffle: True
+
+preprocessing:
+  gsc_default: True
+  target_rate: 16000
+  sample_length: 1.0
+  random_position: True
+  time_shift_ms: 100
+  background_noise_path: ../../datasets/speech_commands_v0.02/_background_noise_
+  background_frequency: 0.8
+  background_volume: 0.1
+  # These WAVs are used only to generate validation/test silence and are
+  # excluded from online training augmentation and training silence.
+  reserved_background_files: ['running_tap.wav']
+
+feature_extraction:
+  patch_length: 96
+  n_mels: 64
+  overlap: 0.25
+  n_fft: 512
+  hop_length: 160
+  window_length: 400
+  window: hann
+  center: False
+  pad_mode: constant
+  power: 1.0
+  fmin: 125
+  fmax: 7500
+  norm: None
+  htk : True
+  to_db : False
+  include_last_patch: False
+
+# This section is not mandatory for training, but we leave it here as it is usually included.
+data_augmentation:
+  GaussianNoise: 
+    enable: False
+    scale : 0.1
+  VolumeAugment:
+    enable: False
+    min_scale: 0.8
+    max_scale: 1.2
+  SpecAug: 
+    enable : False
+    freq_mask_param: 1
+    time_mask_param: 1
+    n_freq_mask: 3
+    n_time_mask: 4
+    mask_value : 0
+
+training:
+  fine_tune: True # Set to True if you want to fine-tune a pretrained model from the zoo
+  dropout: 0
+  batch_size: 32
+  epochs: 200
+  resume_training: # Optional, use to resume a training from a previous experiment.
+  optimizer:
+    Adam:
+      learning_rate: 0.001
+  callbacks:          # Optional section
+    ReduceLROnPlateau:
+      monitor: val_accuracy
+      mode: max
+      factor: 0.5
+      patience: 100
+      min_lr: 1.0e-05
+    EarlyStopping:
+      monitor: val_accuracy
+      mode: max
+      restore_best_weights: true
+      patience: 60
+      
+quantization:
+  quantizer: TFlite_converter
+  quantization_type: PTQ
+  quantization_input_type: int8
+  quantization_output_type: float
+  granularity: per_channel          # Optional, defaults to "per_channel". 
+  # optimize: True                     # Optional, defaults to False.
+  # target_opset: 17                   # Optional, defaults to 17. Only used for ONNX quantization
+  onnx_extra_options: 
+    CalibMovingAverage: True
+  onnx_quant_parameters:
+    op_types_to_quantize: ["Conv", "Relu", "Squeeze", "GlobalAveragePool", "Gemm", "Transpose"] #All except softmax to preserve float output. Transpose probably unnecessary.
+  export_dir: quantized_models
+
+
+tools:
+  stedgeai:
+    optimization: balanced
+    on_cloud: True
+    path_to_stedgeai: C:/ST/STEdgeAI/<x.y>/Utilities/windows/stedgeai.exe
+  path_to_cubeIDE: C:/ST/STM32CubeIDE_<*.*.*>/STM32CubeIDE/stm32cubeide.exe
+
+benchmarking:
+  board: B-U585I-IOT02A
+  
+mlflow:
+  uri: file:///home/xpohl/stm32ai-mlruns
+
+hydra:
+  run:
+    dir: ./tf/src/experiments_outputs/${now:%Y_%m_%d_%H_%M_%S}
