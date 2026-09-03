@@ -2,7 +2,7 @@
 # backbone frozen. All unspecified settings are inherited from the current GSC
 # preprocessing/fine-tuning configuration.
 defaults:
-  - user_config_gsc12_gsc_preproc_ft
+  - user_config_gsc12_gsc_preproc
   - _self_
 
 general:
@@ -12,9 +12,9 @@ operation_mode: training
 
 training:
   fine_tune: False
-  dropout: 0.2
+  dropout: 0
   batch_size: 32
-  epochs: 30
+  epochs: 200
   resume_training:
   optimizer:
     Adam:
@@ -35,4 +35,4 @@ training:
 # A stable directory gives stage 2 a predictable checkpoint path.
 hydra:
   run:
-    dir: ./tf/src/experiments_outputs/gsc12_stage1_head
+    dir: ./tf/src/experiments_outputs/gsc12_stage1_head_v03

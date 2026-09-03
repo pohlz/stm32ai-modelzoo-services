@@ -165,13 +165,15 @@ class AEDTrainer:
         self.augmented_model = None
         self.history = None
 
+        # Prepare (including an optional resume-time unfreeze) before printing
+        # the summary so the reported trainable counts match actual training.
+        self._prepare_model()
         self._log_and_print_info()
         self.callbacks = _get_callbacks(callbacks_dict=cfg.training.callbacks,
                               output_dir=self.output_dir,
                               saved_models_dir=self.saved_models_dir,
                               logs_dir=cfg.general.logs_dir)
         
-        self._prepare_model()
         self._enable_determinism()
 
     def train(self):
@@ -270,10 +272,13 @@ class AEDTrainer:
         # Display a summary of the model
         if self.cfg.training.resume_training:
             model_summary(self.model)
-            if len(self.model.layers) == 2:
-                model_summary(self.model.layers[1])
-            else:
-                model_summary(self.model.layers[2])
+            # Resumed augmented models may contain zero, one, or several
+            # preprocessing layers. Show the innermost model without assuming
+            # that it is always stored at outer layer index 1 or 2.
+            for layer in reversed(self.model.layers):
+                if isinstance(layer, tf.keras.Model):
+                    model_summary(layer)
+                    break
         else:
             model_summary(self.model)
 
