@@ -96,7 +96,7 @@ data_augmentation:
 
 training:
   fine_tune: True # Set to True if you want to fine-tune a pretrained model from the zoo
-  dropout: 0.1
+  dropout: 0.0
   batch_size: 32
   epochs: 100
   resume_training: # Optional, use to resume a training from a previous experiment.
@@ -146,4 +146,4 @@ mlflow:
 
 hydra:
   run:
-    dir: ./tf/src/experiments_outputs/bcresnet_ft_v01_${now:%Y_%m_%d_%H_%M_%S}
+    dir: ./tf/src/experiments_outputs/bcresnet_ft_v02_${now:%Y_%m_%d_%H_%M_%S}
