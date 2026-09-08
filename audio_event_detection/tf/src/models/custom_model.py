@@ -49,6 +49,7 @@ def _conv_bn_activation(
     strides=(1, 1),
     dilation_rate=(1, 1),
     groups: int = 1,
+    padding: str = "same",
     activation: Optional[str] = "relu",
 ) -> tf.Tensor:
     """Convolution followed by batch normalization and an optional activation."""
@@ -56,7 +57,7 @@ def _conv_bn_activation(
         filters,
         kernel_size,
         strides=strides,
-        padding="same",
+        padding=padding,
         dilation_rate=dilation_rate,
         groups=groups,
         use_bias=False,
@@ -75,10 +76,11 @@ def _sub_spectral_norm(
     name: str,
     groups: int = _SSN_GROUPS,
 ) -> tf.Tensor:
-    """Apply five-band SubSpectralNorm using only serializable Keras layers.
+    """Apply five-band SubSpectralNorm without full-tensor transposes.
 
-    SubSpectralNorm folds each frequency sub-band into the channel dimension,
-    applies independent BatchNorm statistics/affines, and restores NHWC layout.
+    Each frequency band has its own BatchNorm statistics and affine parameters,
+    which is equivalent to folding the bands into the channel dimension. Keeping
+    the tensor in NHWC layout avoids two large transposes in the exported graph.
     """
     if frequency_bins % groups:
         raise ValueError(
@@ -86,16 +88,82 @@ def _sub_spectral_norm(
             f"by the {groups} SubSpectralNorm groups."
         )
 
+    if x.shape[-1] is not None and int(x.shape[-1]) != channels:
+        raise ValueError(
+            f"{name}: expected {channels} channels, got {int(x.shape[-1])}."
+        )
+
     band_bins = frequency_bins // groups
-    x = layers.Permute((3, 1, 2), name=f"{name}_to_chw")(x)
-    x = layers.Reshape(
-        (channels * groups, band_bins, -1), name=f"{name}_fold_bands"
-    )(x)
-    x = layers.BatchNormalization(axis=1, name=f"{name}_bn")(x)
-    x = layers.Reshape(
-        (channels, frequency_bins, -1), name=f"{name}_unfold_bands"
-    )(x)
-    return layers.Permute((2, 3, 1), name=f"{name}_to_hwc")(x)
+    normalized_bands = []
+    for band_index in range(groups):
+        top = band_index * band_bins
+        bottom = frequency_bins - (band_index + 1) * band_bins
+        band = layers.Cropping2D(
+            cropping=((top, bottom), (0, 0)),
+            name=f"{name}_band{band_index + 1}_slice",
+        )(x)
+        band = layers.BatchNormalization(
+            name=f"{name}_band{band_index + 1}_bn"
+        )(band)
+        normalized_bands.append(band)
+
+    return layers.Concatenate(axis=1, name=f"{name}_concat")(normalized_bands)
+
+
+def _npu_frequency_average(
+    x: tf.Tensor,
+    frequency_bins: int,
+    name: str,
+) -> tf.Tensor:
+    """Average the complete frequency axis using pooling kernels up to 3x1.
+
+    BC-ResNet-1 reaches this helper with 20, 10, or 5 frequency bins. Factors
+    of two are reduced with 2x1 average pooling. The remaining five rows are
+    padded to six, reduced with 3x1 and 2x1 pooling, and multiplied by 6/5 to
+    compensate exactly for the padded zero row.
+    """
+    remaining_bins = int(frequency_bins)
+    if remaining_bins < 1:
+        raise ValueError(f"{name}: frequency_bins must be positive")
+
+    while remaining_bins % 2 == 0:
+        x = layers.AveragePooling2D(
+            pool_size=(2, 1),
+            strides=(2, 1),
+            padding="valid",
+            name=f"{name}_avg2_from_{remaining_bins}",
+        )(x)
+        remaining_bins //= 2
+
+    if remaining_bins == 5:
+        x = layers.ZeroPadding2D(
+            padding=((0, 1), (0, 0)),
+            name=f"{name}_pad5_to6",
+        )(x)
+        x = layers.AveragePooling2D(
+            pool_size=(3, 1),
+            strides=(3, 1),
+            padding="valid",
+            name=f"{name}_avg3",
+        )(x)
+        x = layers.AveragePooling2D(
+            pool_size=(2, 1),
+            strides=(2, 1),
+            padding="valid",
+            name=f"{name}_avg2_final",
+        )(x)
+        x = layers.Rescaling(
+            scale=6.0 / 5.0,
+            name=f"{name}_mean_correction",
+        )(x)
+        remaining_bins = 1
+
+    if remaining_bins != 1:
+        raise ValueError(
+            f"{name}: unsupported frequency size {frequency_bins}; "
+            "expected a power-of-two multiple of 5."
+        )
+    return x
 
 
 def _bc_res_block(
@@ -143,10 +211,10 @@ def _bc_res_block(
     )
     auxiliary_2d_residual = x
 
-    # Average over frequency to create the temporal representation.
-    temporal = layers.AveragePooling2D(
-        pool_size=(out_frequency, 1), name=f"{name}_frequency_average"
-    )(x)
+    # Average over frequency with Neural-ART-friendly kernels no larger than 3x1.
+    temporal = _npu_frequency_average(
+        x, out_frequency, name=f"{name}_frequency_average"
+    )
 
     # f1: dilated 1x3 temporal depthwise convolution, BN, swish, pointwise
     # convolution, and channel-wise dropout.
@@ -167,14 +235,16 @@ def _bc_res_block(
             dropout, name=f"{name}_channel_dropout"
         )(temporal)
 
-    # Explicit expansion avoids relying on implicit broadcasting during export.
-    temporal = layers.UpSampling2D(
-        size=(out_frequency, 1), interpolation="nearest", name=f"{name}_broadcast"
-    )(temporal)
-    residuals = [auxiliary_2d_residual, temporal]
+    # Keep the temporal branch at 1 x time x channels and let Add broadcast it
+    # over frequency. This preserves the BC-ResNet equation while exporting a
+    # Neural-ART-supported broadcast ADD instead of an unsupported TILE.
     if not transition:
-        residuals.insert(0, shortcut)
-    x = layers.Add(name=f"{name}_add")(residuals)
+        auxiliary_2d_residual = layers.Add(name=f"{name}_local_add")(
+            [shortcut, auxiliary_2d_residual]
+        )
+    x = layers.Add(name=f"{name}_add")(
+        [auxiliary_2d_residual, temporal]
+    )
     return layers.ReLU(name=f"{name}_out")(x)
 
 
@@ -234,12 +304,20 @@ def get_custom_model(
     channels = _scaled_channels(base_channels, width_multiplier)
     inputs = tf.keras.Input(shape=input_shape, name="log_mel_patch")
 
+    # Match the paper's symmetric two-element padding explicitly. TensorFlow
+    # "same" padding would be asymmetric for a 40-row input with stride two.
+    x = layers.ZeroPadding2D(
+        padding=((2, 2), (2, 2)),
+        name="stem_pad",
+    )(inputs)
+
     # Front-end 5x5 convolution: 1x40xW -> 16x20xW for BC-ResNet-1.
     x = _conv_bn_activation(
-        inputs,
+        x,
         channels[0],
         5,
         strides=(2, 1),
+        padding="valid",
         name="stem",
     )
 
@@ -259,11 +337,10 @@ def get_custom_model(
                 name=f"stage{stage_index + 1}_block{block_index + 1}",
             )
 
-    # The authors' released architecture uses a 5x5 depthwise classifier
-    # convolution with valid frequency padding and same temporal padding.
-    x = layers.ZeroPadding2D(padding=((0, 0), (2, 2)), name="classifier_time_pad")(x)
+    # Table 1 specifies a 5x1 depthwise classifier convolution, reducing only
+    # the five-row frequency axis and preserving the temporal dimension.
     x = layers.DepthwiseConv2D(
-        (5, 5), padding="valid", use_bias=False, name="classifier_depthwise"
+        (5, 1), padding="valid", use_bias=False, name="classifier_depthwise"
     )(x)
     x = _conv_bn_activation(
         x, channels[-1], 1, name="classifier_projection"
