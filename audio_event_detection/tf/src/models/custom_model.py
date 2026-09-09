@@ -235,14 +235,16 @@ def _bc_res_block(
             dropout, name=f"{name}_channel_dropout"
         )(temporal)
 
-    # Explicit expansion avoids relying on implicit broadcasting during export.
-    temporal = layers.UpSampling2D(
-        size=(out_frequency, 1), interpolation="nearest", name=f"{name}_broadcast"
-    )(temporal)
-    residuals = [auxiliary_2d_residual, temporal]
+    # Keep the temporal branch at 1 x time x channels and let Add broadcast it
+    # over frequency. This preserves the BC-ResNet equation while exporting a
+    # Neural-ART-supported broadcast ADD instead of an unsupported TILE.
     if not transition:
-        residuals.insert(0, shortcut)
-    x = layers.Add(name=f"{name}_add")(residuals)
+        auxiliary_2d_residual = layers.Add(name=f"{name}_local_add")(
+            [shortcut, auxiliary_2d_residual]
+        )
+    x = layers.Add(name=f"{name}_add")(
+        [auxiliary_2d_residual, temporal]
+    )
     return layers.ReLU(name=f"{name}_out")(x)
 
 
