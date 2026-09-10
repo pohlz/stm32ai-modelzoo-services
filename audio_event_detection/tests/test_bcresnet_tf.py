@@ -31,6 +31,22 @@ def upstream_classes():
 
 
 class KwsStreamingTests(unittest.TestCase):
+    def test_evaluators_save_reports_when_gui_display_is_disabled(self):
+        # Guard against the old regression where display_figures=false also
+        # suppressed creation of confusion-matrix artifacts.
+        for relative in ("tf/src/evaluation/keras_evaluator.py",
+                         "tf/src/evaluation/tflite_evaluator.py"):
+            source = (ROOT / relative).read_text()
+            tree = ast.parse(source)
+            evaluate = next(node for node in ast.walk(tree)
+                            if isinstance(node, ast.FunctionDef) and node.name == "evaluate")
+            calls = [node for node in ast.walk(evaluate) if isinstance(node, ast.Call)]
+            self.assertTrue(any(isinstance(call.func, ast.Attribute)
+                                and call.func.attr == "_display_figures" for call in calls))
+            self.assertFalse(any(isinstance(node, ast.If)
+                                 and "display_figures" in ast.unparse(node.test)
+                                 for node in ast.walk(evaluate)))
+
     def test_upstream_block_parity(self):
         classes = upstream_classes()
         for transition in (True, False):

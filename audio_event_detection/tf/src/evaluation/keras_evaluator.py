@@ -144,8 +144,9 @@ class AEDKerasEvaluator(BaseAEDEvaluator):
                                 f"On dataset : {self.name_ds} \n"
                                 f"Float model clip-level accuracy : {clip_level_accuracy}")
             
-        if self.display_figures:
-            self._display_figures()
+        # plot_confusion_matrix writes the STM report PNG. Do this regardless
+        # of display_figures: that option controls GUI display, not artifacts.
+        self._display_figures()
             
         print("[INFO] : Evaluation complete")
         if self.clip_labels is not None:

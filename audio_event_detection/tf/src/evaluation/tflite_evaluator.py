@@ -49,8 +49,9 @@ class AEDTFliteEvaluator(BaseAEDEvaluator):
         self.target = self._get_target()
         self.ai_runner = self._get_interpreter(self.target)
 
-        # Sort class names alphabetically just in case 
-        self.class_names = sorted(self.class_names)
+        # Keep the configured order. Dataset one-hot labels and confusion-matrix
+        # indices use cfg.dataset.class_names; sorting here mislabels the axes.
+        self.class_names = list(self.class_names)
 
     def _get_preds_on_host(self):
         """
@@ -189,8 +190,9 @@ class AEDTFliteEvaluator(BaseAEDEvaluator):
                                 f"On dataset : {self.name_ds} \n"
                                 f"Quantized model clip-level accuracy : {clip_level_accuracy}")
         
-        if self.display_figures:
-            self._display_figures()
+        # plot_confusion_matrix writes the STM report PNG. Do this regardless
+        # of display_figures: that option controls GUI display, not artifacts.
+        self._display_figures()
             
         print("[INFO] : Evaluation complete")
         if self.clip_labels is not None:
