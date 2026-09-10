@@ -12,6 +12,7 @@ from torch.utils.data import DataLoader
 
 from .dataset import GSCDataset
 from .models import get_custom_model
+from .reporting import plot_training_history, plot_confusion_counts
 
 
 def validate_config(cfg):
@@ -55,18 +56,26 @@ def load_weights(model, path, cfg):
     model.load_state_dict(checkpoint, strict=True)
 
 
-def evaluate(model, loader, device):
+def evaluate(model, loader, device, *, output_dir=None, class_names=None, split="validation"):
     model.eval()
     loss_sum = correct = count = 0
+    if output_dir is not None and not class_names:
+        raise ValueError("class_names are required when writing evaluation reports")
+    counts = np.zeros((len(class_names), len(class_names)), dtype=np.int64) if output_dir is not None else None
     with torch.inference_mode():
         for inputs, targets in loader:
             inputs, targets = inputs.to(device), targets.to(device)
             logits = model(inputs)
             loss_sum += torch.nn.functional.cross_entropy(logits, targets, reduction="sum").item()
-            correct += (logits.argmax(1) == targets).sum().item()
+            predictions = logits.argmax(1)
+            correct += (predictions == targets).sum().item()
+            if counts is not None:
+                np.add.at(counts, (targets.cpu().numpy(), predictions.cpu().numpy()), 1)
             count += targets.numel()
     if not count:
         raise ValueError("Cannot evaluate an empty dataset")
+    if counts is not None:
+        plot_confusion_counts(counts, class_names, output_dir, split)
     return {"loss": loss_sum / count, "accuracy": correct / count, "samples": count}
 
 
@@ -140,9 +149,12 @@ def run(cfg, output_dir):
                 torch.save(checkpoint, saved / "best_model.pth")
             (output / "history.json").write_text(json.dumps(history, indent=2))
         load_weights(model, saved / "best_model.pth", cfg)
-    results = {"validation": evaluate(model, valid, device)}
+        plot_training_history(history, output)
+    results = {"validation": evaluate(model, valid, device, output_dir=output,
+                                      class_names=list(cfg.dataset.class_names))}
     if cfg.dataset.get("test_csv_path"):
-        results["test"] = evaluate(model, loader("test"), device)
+        results["test"] = evaluate(model, loader("test"), device, output_dir=output,
+                                   class_names=list(cfg.dataset.class_names), split="test")
     (output / "metrics.json").write_text(json.dumps(results, indent=2))
     print(json.dumps(results, indent=2))
     return results

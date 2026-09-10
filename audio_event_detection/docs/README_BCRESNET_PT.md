@@ -36,6 +36,33 @@ and saves each run under `pt/src/experiments_outputs/`. Outputs include
 `config.yaml`, `history.json`, `metrics.json`, `saved_models/best_model.pth`
 (lowest validation loss), and `saved_models/last_model.pth`.
 
+Training also saves `Training_curves.png` with train/validation accuracy and loss
+using the shared STM `vis_training_curves` function (accuracy in [0, 1],
+zero-based epoch steps, as in the TF scripts). Final evaluation of the best
+checkpoint saves `float_model_patch_confusion_matrix_validation_set.png` and
+`float_model_clip_confusion_matrix_validation_set.png`, using the shared STM
+normalized heatmap renderer. Rows are true labels and columns predicted labels,
+in YAML class order. Matching CSVs contain raw counts; classes without examples
+remain blank in the normalized plot. Patch and clip matrices coincide because
+the GSC adapter uses one patch per clip. Configured test data additionally gets
+`*_test_set.png`/CSV reports. Evaluation-only runs also save the confusion matrices.
+Figures are saved headlessly; TensorFlow is not imported.
+
+To add figures to an already completed run, from `audio_event_detection`:
+
+```sh
+python tools/plot_bcresnet_pt_run.py --run-dir pt/src/experiments_outputs/bcresnet_py_v03_2026_09_09_15_57_39
+```
+
+This reads the saved `history.json` and `config.yaml`, loads `best_model.pth`,
+and evaluates the configured validation/test CSVs without retraining. It adds
+the PNGs, count CSVs and `report_metrics.json` without modifying original
+metrics/history/config or weights. It requires the original evaluation dataset.
+`--data-base` can specify the original launch directory for relative dataset
+paths (default: AED folder); `--device cpu` and `--threads 4` control inference
+resources. Install the updated `pt/requirements.txt` for matplotlib, seaborn and
+shared plotting dependencies.
+
 Evaluate a checkpoint, using the same tau, input features and class order:
 
 ```sh
