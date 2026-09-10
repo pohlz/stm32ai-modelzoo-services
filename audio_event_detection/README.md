@@ -1,5 +1,7 @@
 # Audio event detection (AED) STM32 model zoo
 
+For the Google `kws_streaming` TensorFlow custom model and train/quantize/evaluate configuration, see [BC-ResNet TensorFlow](docs/README_BCRESNET_TF.md).
+
 For the original Qualcomm PyTorch custom KWS model, see [BC-ResNet PyTorch setup and configuration](docs/README_BCRESNET_PT.md).
 
 ## Directory components:
