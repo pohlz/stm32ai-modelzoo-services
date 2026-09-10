@@ -118,4 +118,4 @@ hydra:
   job:
     chdir: false
   run:
-    dir: ./tf/src/experiments_outputs/bcresnet_tf_v03_${now:%Y_%m_%d_%H_%M_%S}
+    dir: ./tf/src/experiments_outputs/bcresnet_tf_v04_${now:%Y_%m_%d_%H_%M_%S}
