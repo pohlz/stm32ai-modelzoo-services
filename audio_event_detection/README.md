@@ -1,5 +1,7 @@
 # Audio event detection (AED) STM32 model zoo
 
+For the original Qualcomm PyTorch custom KWS model, see [BC-ResNet PyTorch setup and configuration](docs/README_BCRESNET_PT.md).
+
 ## Directory components:
 * [docs](docs/) contains all readmes and documentation specific to the audio event detection use case.
 * [tf/src](docs/README_OVERVIEW.md) contains tools to train, evaluate, benchmark, quantize and deploy your model on your STM32 target.
