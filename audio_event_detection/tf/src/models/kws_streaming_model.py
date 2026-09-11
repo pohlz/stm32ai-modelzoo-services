@@ -31,7 +31,7 @@ def _block(x, filters, dilation, stride, dropout, name, transition):
                           name=name + "_transition")(x)
         x = layers.BatchNormalization(name=name + "_transition_bn")(x)
         x = layers.ReLU(name=name + "_transition_relu")(x)
-    x = layers.DepthwiseConv2D((1, 3), dilation_rate=dilation, padding="same",
+    x = layers.DepthwiseConv2D((1, 3), dilation_rate=(1,1), padding="same",
                                use_bias=False, name=name + "_frequency_dw")(x)
     x = _ssn(x, name + "_ssn")
     residual = x
@@ -74,6 +74,11 @@ def get_custom_model(num_classes=None, input_shape=None, dropout=0.1,
             (2, 2, 4, 4), (8, 12, 16, 20),
             ((1, 1), (2, 1), (3, 1), (3, 1)),
             ((1, 1), (1, 2), (1, 2), (1, 1))), 1):
+   # for stage, (n, filters, dilation, stride) in enumerate(zip(
+   #          (2, 2, 4, 4),
+   #          (8, 12, 16, 20),
+   #          ((1, 1), (1, 1), (1, 1), (1, 1)),
+   #          ((1, 1), (1, 2), (1, 2), (1, 1))), 1):
         x = _block(x, filters, dilation, stride, dropout, f"stage{stage}_transition", True)
         for block in range(n):
             x = _block(x, filters, dilation, (1, 1), dropout,
