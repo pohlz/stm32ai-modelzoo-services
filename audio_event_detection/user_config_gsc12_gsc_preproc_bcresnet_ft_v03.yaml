@@ -98,7 +98,7 @@ training:
   fine_tune: True # Set to True if you want to fine-tune a pretrained model from the zoo
   dropout: 0.0
   batch_size: 32
-  epochs: 4
+  epochs: 100
   resume_training: # Optional, use to resume a training from a previous experiment.
   optimizer:
     Adam:

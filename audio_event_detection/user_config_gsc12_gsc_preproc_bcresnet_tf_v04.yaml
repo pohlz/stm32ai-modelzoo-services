@@ -85,7 +85,7 @@ data_augmentation:
 
 training:
   fine_tune: false
-  dropout: 0.5 # Same rate as PyTorch v03; Google's model default is 0.5.
+  dropout: 0.1 # Same rate as PyTorch v03; Google's model default is 0.5.
   batch_size: 100
   epochs: 200
   resume_training: null
