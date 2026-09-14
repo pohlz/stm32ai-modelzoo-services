@@ -72,7 +72,7 @@ data_augmentation:
     enable: false
     scale: 0.1
   VolumeAugment:
-    enable: false
+    enable: True
     min_scale: 0.8
     max_scale: 1.2
   SpecAug:
@@ -85,7 +85,7 @@ data_augmentation:
 
 training:
   fine_tune: false
-  dropout: 0.1 # Same rate as PyTorch v03; Google's model default is 0.5.
+  dropout: 0.1 # Same rate 0.1 as PyTorch v03; Google's model default is 0.5.
   batch_size: 100
   epochs: 200
   resume_training: null
