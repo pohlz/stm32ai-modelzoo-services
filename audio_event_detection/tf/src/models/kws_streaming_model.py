@@ -10,6 +10,7 @@ kws_streaming/upstream/. See docs/README_BCRESNET_TF.md for adaptation details.
 """
 
 import tensorflow as tf
+import numpy as np
 from tensorflow.keras import layers
 
 
@@ -35,7 +36,21 @@ def _block(x, filters, dilation, stride, dropout, name, transition):
                                use_bias=False, name=name + "_frequency_dw")(x)
     x = _ssn(x, name + "_ssn")
     residual = x
-    x = layers.AveragePooling2D((1, int(x.shape[2])), name=name + "_frequency_mean")(x)
+#    x = layers.AveragePooling2D((1, int(x.shape[2])), name=name + "_frequency_mean")(x)
+#   Start of averagepooling2d replacement
+    n = int(x.shape[2])
+    x = layers.DepthwiseConv2D(
+        kernel_size=(1, n),
+        strides=(1, 1),
+        padding="valid",
+        depth_multiplier=1,
+        use_bias=False,
+        depthwise_initializer=tf.keras.initializers.Constant(1.0 / n),
+        trainable=False,
+        name=name + "_frequency_mean_dw",
+    )(x)
+
+#   End of averagepooling2d replacement
     x = layers.DepthwiseConv2D((3, 1), dilation_rate=dilation, padding="same",
                                use_bias=False, name=name + "_temporal_dw")(x)
     x = layers.BatchNormalization(name=name + "_temporal_bn")(x)
