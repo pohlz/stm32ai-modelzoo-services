@@ -9,7 +9,7 @@ general:
 operation_mode: deployment
 
 model: 
-  model_path: ./tf/src/experiments_outputs/bcresnet_tf_v04_2026_09_13_07_26_54/quantized_models/quantized_model.tflite
+  model_path: ./tf/src/experiments_outputs/bcresnet_tf_v04_2026_09_15_09_59_47/quantized_models/quantized_model.tflite
 
 # Change this path to the model you wish to use
 dataset:

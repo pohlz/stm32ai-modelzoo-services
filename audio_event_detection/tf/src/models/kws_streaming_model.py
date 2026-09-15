@@ -59,8 +59,14 @@ def _block(x, filters, dilation, stride, dropout, name, transition):
                       use_bias=False, name=name + "_pointwise")(x)
     x = layers.SpatialDropout2D(dropout, name=name + "_dropout")(x)
     if not transition:
-        x = layers.Add(name=name + "_identity_add")([x, identity])
-    x = layers.Add(name=name + "_residual_add")([x, residual])
+        # Keep the full-size tensor first and the frequency-broadcast tensor
+        # second. ADD is commutative and this ordering matches Neural-ART's
+        # supported unidirectional broadcasting convention.
+        x = layers.Add(name=name + "_identity_add")([identity, x])
+    # In a transition block, this ADD performs the frequency broadcast. In a
+    # normal block, x was already expanded to the residual tensor's shape by
+    # the identity ADD above.
+    x = layers.Add(name=name + "_residual_add")([residual, x])
     return layers.ReLU(name=name + "_relu")(x)
 
 
@@ -99,7 +105,17 @@ def get_custom_model(num_classes=None, input_shape=None, dropout=0.1,
             x = _block(x, filters, dilation, (1, 1), dropout,
                        f"stage{stage}_normal{block + 1}", False)
     x = layers.DepthwiseConv2D(5, padding="same", name="classifier_dw")(x)
-    x = layers.AveragePooling2D((1, int(x.shape[2])), name="classifier_frequency_mean")(x)
+    n = int(x.shape[2])
+    x = layers.DepthwiseConv2D(
+        kernel_size=(1, n),
+        strides=(1, 1),
+        padding="valid",
+        depth_multiplier=1,
+        use_bias=False,
+        depthwise_initializer=tf.keras.initializers.Constant(1.0 / n),
+        trainable=False,
+        name="classifier_frequency_mean_dw",
+    )(x)
     x = layers.Conv2D(32, 1, use_bias=False, name="classifier_projection")(x)
     x = layers.GlobalAveragePooling2D(keepdims=True, name="classifier_time_mean")(x)
     classes = int(num_classes) + int(bool(use_garbage_class))
