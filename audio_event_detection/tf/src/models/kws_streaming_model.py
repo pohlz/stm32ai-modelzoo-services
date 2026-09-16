@@ -71,12 +71,25 @@ def _block(x, filters, dilation, stride, dropout, name, transition):
 
 
 def get_custom_model(num_classes=None, input_shape=None, dropout=0.1,
-                     use_garbage_class=False, multi_label=False, **kwargs):
-    """Build Google's BC-ResNet-1 defaults for STM (frequency,time,channel).
+                     use_garbage_class=False, multi_label=False, tau=8, **kwargs):
+    """Build Google's BC-ResNet-tau defaults for STM (frequency,time,channel).
 
     blocks_n counts NORMAL blocks, plus one transition per stage. Dropout is
     supplied by the training config. Softmax matches STM's cross-entropy loss.
     """
+    if tau not in (1, 1.5, 2, 3, 6, 8):
+        raise ValueError("tau must be one of: 1, 1.5, 2, 3, 6, 8")
+    base_c = int(8 * tau)
+    stem_channels = base_c * 2
+    stage_channels = (
+        base_c,
+        int(base_c * 1.5),
+        base_c * 2,
+        int(base_c * 2.5),
+    )
+    classifier_channels = base_c * 4
+
+
     if num_classes is None or int(num_classes) < 1:
         raise ValueError("num_classes must be positive")
     if input_shape is None or len(input_shape) != 3:
@@ -90,9 +103,9 @@ def get_custom_model(num_classes=None, input_shape=None, dropout=0.1,
     inputs = layers.Input(shape=shape, name="log_mel_patch")
     x = layers.Permute((2, 1, 3), name="stm_to_kws_time_frequency")(inputs)
     # Upstream stem has bias, no batch normalization and no activation.
-    x = layers.Conv2D(16, 5, strides=(1, 2), padding="same", name="stem")(x)
+    x = layers.Conv2D(stem_channels, 5, strides=(1, 2), padding="same", name="stem")(x)
     for stage, (n, filters, dilation, stride) in enumerate(zip(
-            (2, 2, 4, 4), (8, 12, 16, 20),
+            (2, 2, 4, 4), stage_channels,
             ((1, 1), (2, 1), (3, 1), (3, 1)),
             ((1, 1), (1, 2), (1, 2), (1, 1))), 1):
    # for stage, (n, filters, dilation, stride) in enumerate(zip(
@@ -116,10 +129,10 @@ def get_custom_model(num_classes=None, input_shape=None, dropout=0.1,
         trainable=False,
         name="classifier_frequency_mean_dw",
     )(x)
-    x = layers.Conv2D(32, 1, use_bias=False, name="classifier_projection")(x)
+    x = layers.Conv2D(classifier_channels, 1, use_bias=False, name="classifier_projection")(x)
     x = layers.GlobalAveragePooling2D(keepdims=True, name="classifier_time_mean")(x)
     classes = int(num_classes) + int(bool(use_garbage_class))
     x = layers.Conv2D(classes, 1, use_bias=False, name="classifier_logits")(x)
     x = layers.Reshape((classes,), name="flatten_logits")(x)
     outputs = layers.Activation("sigmoid" if multi_label else "softmax", name="predictions")(x)
-    return tf.keras.Model(inputs, outputs, name="kws_streaming_bc_resnet_1")
+    return tf.keras.Model(inputs, outputs, name=f"kws_streaming_bc_resnet_{tau:g}")
