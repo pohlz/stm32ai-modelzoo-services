@@ -50,7 +50,7 @@ class SpecAugment(Layer):
         f = tf.cast(tf.random.uniform(shape=(), maxval=self.freq_mask_param), tf.int32)
         f0 = tf.cast(tf.random.uniform(shape=(), maxval=n_mels - tf.cast(f, tf.float32)), tf.int32)
 
-        condition = tf.logical_and(freq_indices >= f0, freq_indices <= f0 + f)
+        condition = tf.logical_and(freq_indices >= f0, freq_indices < f0 + f)
         return tf.cast(condition, tf.float32)
 
     def _frequency_masks(self, input_mel_spectrogram: tf.Tensor) -> tf.Tensor:
@@ -75,7 +75,7 @@ class SpecAugment(Layer):
         t = tf.cast(tf.random.uniform(shape=(), maxval=self.time_mask_param), tf.int32)
         t0 = tf.cast(tf.random.uniform(shape=(), maxval=n_steps - tf.cast(t, tf.float32)), tf.int32)
 
-        condition = tf.logical_and(time_indices >= t0, time_indices <= t0 + t)
+        condition = tf.logical_and(time_indices >= t0, time_indices < t0 + t)
         return tf.cast(condition, tf.float32)
 
     def _time_masks(self, input_mel_spectrogram: tf.Tensor) -> tf.Tensor:

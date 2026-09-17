@@ -72,15 +72,21 @@ data_augmentation:
     enable: false
     scale: 0.1
   VolumeAugment:
-    enable: True
+    enable: false
     min_scale: 0.8
     max_scale: 1.2
   SpecAug:
+#    enable: true
+#    freq_mask_param: 1
+#    time_mask_param: 1
+#    n_freq_mask: 3
+#    n_time_mask: 4
+#    mask_value: 0
     enable: true
-    freq_mask_param: 1
-    time_mask_param: 1
-    n_freq_mask: 3
-    n_time_mask: 4
+    freq_mask_param: 7
+    time_mask_param: 20
+    n_freq_mask: 2
+    n_time_mask: 2
     mask_value: 0
 
 training:
