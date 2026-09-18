@@ -64,7 +64,7 @@ feature_extraction:
   hop_length: 320
   window_length: 1024
   window: hann
-  center: false
+  center: true
   pad_mode: constant
   power: 2.0
   fmin: 20
