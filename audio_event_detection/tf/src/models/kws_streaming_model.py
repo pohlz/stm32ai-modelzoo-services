@@ -71,7 +71,7 @@ def _block(x, filters, dilation, stride, dropout, name, transition):
 
 
 def get_custom_model(num_classes=None, input_shape=None, dropout=0.1,
-                     use_garbage_class=False, multi_label=False, tau=8, **kwargs):
+                     use_garbage_class=False, multi_label=False, tau=3, **kwargs):
     """Build Google's BC-ResNet-tau defaults for STM (frequency,time,channel).
 
     blocks_n counts NORMAL blocks, plus one transition per stage. Dropout is

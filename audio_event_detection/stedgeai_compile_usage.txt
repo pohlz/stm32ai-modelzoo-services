@@ -1,0 +1,33 @@
+Run from Windows Command Prompt:
+
+  stedgeai_compile.bat "MODEL_FOLDER_OR_EXPERIMENT_NAME" "C:\path\board.mpool"
+
+Example (from this script's directory):
+
+  stedgeai_compile.bat "bcresnet_tf_v06_2026_10_22_08_41_42_batchsize_400_hinoise" "..\application_code\audio\STM32N6\Projects\X-CUBE-AI\models\stm32n6.mpool"
+
+An experiment name is resolved under tf\src\experiments_outputs beside this
+script. A folder path is resolved relative to the current working directory.
+The memory-pool path is relative to the current working directory or absolute.
+Both quantize_model.tflite and quantized_model.tflite are accepted recursively;
+multiple matches cause an error instead of selecting a model arbitrarily.
+
+Optional executable override:
+
+  stedgeai_compile.bat "MODEL_FOLDER" "BOARD.mpool" -StEdgeAi "C:\ST\STEdgeAI\4.0\Utilities\windows\stedgeai.exe"
+
+Requires a full Windows STEdgeAI installation (default: C:\ST\STEdgeAI\4.0).
+Targets STM32N6, ST-AI C API, Neural-ART optimization level 3, with cache
+maintenance and native-float software fallback. Neural-ART generates per-pool
+binary weights automatically; the generic --binary switch is unsupported.
+
+Each invocation creates NeuralART_compilation_TIMESTAMP under the model folder.
+Successful output contains generated/, workspace/, Middlewares/ST/AI/, the
+copied memory pool, compiler profile, log, command.json, weights_manifest.txt,
+and INTEGRATION.txt. Existing runs are preserved. Failures return a nonzero
+exit code and retain diagnostics; a failed output is not an integration package.
+
+The memory pool must match the board's available memory and linker layout.
+The supplied project pool may be too small for larger models. ST's reference
+pool uses external RAM and flash; use it only when those regions are available
+and configured on the board. Compilation does not establish hardware validity.
