@@ -27,6 +27,31 @@ copied memory pool, compiler profile, log, command.json, weights_manifest.txt,
 and INTEGRATION.txt. Existing runs are preserved. Failures return a nonzero
 exit code and retain diagnostics; a failed output is not an integration package.
 
+generated/audio_model_weights.h and audio_model_weights.c are generated beside
+the model sources. Copy the header to your audio include folder and compile
+the C file in your project whenever replacing the model.
+The C file contains the section table, sources[] array and copy/CRC functions.
+SRAM source defaults are 0x70400000 for the first initializer and 0x70480000
+for the second, ordered by ascending SRAM destination address (512 KiB slots).
+Program the listed binaries at those flash addresses. SOURCE_ADDRESS macros
+can still be overridden in the C file or build flags. Flash-only needs no copy.
+Call AudioModelWeights_Init() once after enabling memories and before model
+initialization/inference; it copies all SRAM initializers and verifies all CRCs.
+It records the weight pool's address from the supplied .mpool, the complete
+binary length, and CRC32 compatible with AudioRuntime_VerifyWeights().
+This header supports one flash initializer and up to two writable SRAM
+initializers, each with an absolute byte address. Section order is ascending
+destination address, documented by numbered macros and binary-name comments.
+CopyAll() uses generated sources[], copies SRAM initializers, cleans CPU cache and verifies
+all section CRCs. For flash sections supply {NULL, 0}; program them in place.
+Verify() checks every destination section. Init(), CopyAll() and Verify() use
+the same API for one or multiple sections; there is no single-section copy helper.
+The original single-range macros remain available for single-section models.
+The batch wrapper requires stedgeai_weights_header.ps1 beside the main script.
+For SRAM weights, firmware must copy the initializer from persistent storage
+to the generated SRAM address before CRC verification and model initialization.
+Verify before inference if the initializer includes mutable activation data.
+
 The memory pool must match the board's available memory and linker layout.
 The supplied project pool may be too small for larger models. ST's reference
 pool uses external RAM and flash; use it only when those regions are available

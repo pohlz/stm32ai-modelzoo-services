@@ -68,6 +68,8 @@ try {
     }
     $weights = @(Get-ChildItem -LiteralPath $generated -Recurse -File -Filter '*.bin')
     if ($weights.Count -eq 0) { throw 'Compiler produced no binary weights. Inspect the log and memory-pool configuration.' }
+    # Generate metadata for every initializer, including writable SRAM pools.
+    & (Join-Path $PSScriptRoot 'stedgeai_weights_header.ps1') -Generated $generated -MemoryPool $poolCopy
     # Include the exact SDK middleware, headers, libraries, and license for manual integration.
     $middleware = Join-Path $out 'Middlewares\ST'
     New-Item -ItemType Directory -Path $middleware | Out-Null
@@ -85,6 +87,26 @@ Middlewares/ST/AI contains the matching installed SDK runtime and license files.
 
 1. Copy generated C/H model files into your project's model source/include folders.
    Add the model include directory and compile the generated C sources.
+   Copy generated/audio_model_weights.h to your application's audio include
+   folder and compile generated/audio_model_weights.c in your project. Its address, full binary size and CRC32
+   match this compilation's initializer binary, whether in flash or SRAM.
+   For SRAM placement, store the initializer in persistent storage and copy it
+   to the generated address after enabling SRAM and before checking the CRC
+   or initializing/running the model. SRAM contents are lost across power-off.
+   Program SRAM initializer binaries in ascending destination order at flash
+   addresses 0x70400000 and 0x70480000 respectively (512 KiB slots). The generated
+   SOURCE_ADDRESS defaults can be overridden in compiler flags. Then call
+   AudioModelWeights_Init() and check its return value. Flash-only models need
+   no source configuration. Init copies SRAM sections and verifies all CRCs.
+   AudioModelWeights_CopyAll() also takes no arguments and uses sources[].
+   The generated array has one {pointer, size} per section; {NULL, 0} for flash
+   already programmed in place. SRAM pointers identify persistent storage.
+   The helper copies SRAM sections, cleans CPU D-cache and verifies every CRC.
+   The same Init/CopyAll/Verify functions handle one or multiple sections.
+   For multiple sections, replace legacy single-range CRC checks with
+   AudioModelWeights_Verify(). Single-range macros exist only for one section.
+   The source address is your flash STORAGE location, not the SRAM destination.
+   If weights and activations share the initializer range, verify before inference.
 2. Integrate the matching ST AI / Neural-ART runtime from Middlewares/ST/AI.
    Use its STM32N6 toolchain libraries and required runtime sources/includes;
    do not compile every middleware source or mix runtime versions.

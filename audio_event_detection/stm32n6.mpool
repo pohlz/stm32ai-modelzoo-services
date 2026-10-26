@@ -40,11 +40,35 @@
 				"offset": { "value": "0x34100000", "magnitude":  "BYTES" },
 				"size":   { "value": "0",       "magnitude": "KBYTES" }
 			},
+      			{
+			        "fname": "AXISRAM3",
+			        "name": "npuRAM3",
+			        "fformat": "FORMAT_RAW",
+			        "prop":   { "rights": "ACC_WRITE", "throughput": "HIGH", "latency": "LOW", "byteWidth": 8, "freqRatio": 1.25, "read_power": 18.531, "write_power": 16.201},
+        			"offset": { "value": "0x34200000", "magnitude": "BYTES"},
+			        "size":   { "value": "0x70000", "magnitude": "BYTES"}
+			},
+		        {
+			        "fname": "AXISRAM4",
+			        "name": "npuRAM4",
+			        "fformat": "FORMAT_RAW",
+			        "prop":   { "rights": "ACC_WRITE", "throughput": "HIGH", "latency": "LOW", "byteWidth": 8, "freqRatio": 1.25, "read_power": 18.531, "write_power": 16.201},
+			        "offset": { "value": "0x34270000", "magnitude": "BYTES"},
+			        "size":   { "value": "0x70000", "magnitude": "BYTES"}
+		        },
+      			{
+			        "fname": "AXISRAM5",
+			        "name": "npuRAM5",
+			        "fformat": "FORMAT_RAW",
+			        "prop":   { "rights": "ACC_WRITE", "throughput": "HIGH", "latency": "LOW", "byteWidth": 8, "freqRatio": 1.25, "read_power": 18.531, "write_power": 16.201},
+			        "offset": { "value": "0x342e0000", "magnitude": "BYTES" },
+			        "size":   { "value": "0x70000", "magnitude": "BYTES"}
+		        },
 			{
 				"fname": "AXISRAM6",
 				"name":  "npuRAM6",
 				"fformat": "FORMAT_RAW",
-				"prop":	  { "rights": "ACC_WRITE", "throughput": "HIGH", "latency": "LOW", "byteWidth": 8, "freqRatio": 1.25, "read_power": 19.006, "write_power": 15.790 },
+				"prop":	  { "rights": "ACC_WRITE", "throughput": "HIGH", "latency": "LOW", "byteWidth": 8, "freqRatio": 1.25, "read_power": 19.006, "write_power": 15.790},
 				"offset": { "value": "0x34350000", "magnitude":  "BYTES" },
 				"size":   { "value": "448",        "magnitude": "KBYTES" }
 			},
@@ -60,10 +84,10 @@
 				"fname": "xSPI2",
 				"name":  "octoFlash",
 				"fformat": "FORMAT_RAW",
-				"prop":	  { "rights": "ACC_READ",  "throughput": "MID", "latency": "HIGH", "byteWidth": 1, "freqRatio": 6.00, "cacheable": "CACHEABLE_ON", "read_power": 110, "write_power": 400.0, "constants_preferred": "true" },
+				"prop":	  { "rights": "ACC_READ",  "throughput": "MID", "latency": "HIGH", "byteWidth": 1, "freqRatio": 6.00, "cacheable": "CACHEABLE_ON", "read_power": 110, "write_power": 400.0},
 				"offset": { "value": "0x70400000", "magnitude":  "BYTES" },
 				"size":   { "value": "1",         "magnitude": "MBYTES" }
 			}
 		]
 	}
-}
+} 
