@@ -15,6 +15,7 @@ from pathlib import Path
 from hydra.core.hydra_config import HydraConfig
 from munch import DefaultMunch
 from omegaconf import DictConfig
+from .candidate_checkpoints import CandidateCheckpoints
 import tensorflow as tf
 import logging
 
@@ -173,6 +174,18 @@ class AEDTrainer:
                               output_dir=self.output_dir,
                               saved_models_dir=self.saved_models_dir,
                               logs_dir=cfg.general.logs_dir)
+
+	if cfg.operation_mode == "chain_tqe":
+    		self.callbacks.append(
+        		CandidateCheckpoints(
+            			directory=(
+                			Path(self.output_dir)
+                			/ self.saved_models_dir
+                			/ "candidates"
+            			),
+            			top_k=5,
+        		)
+    		)
         
         self._enable_determinism()
 
