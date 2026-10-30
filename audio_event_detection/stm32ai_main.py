@@ -70,25 +70,25 @@ def _process_mode(mode: str = None, cfg: DictConfig = None) -> None:
         dataloaders = get_dataloaders(cfg=cfg)
 
     if mode == "chain_tqe":
-    cache_dir = Path(cfg.output_dir) / "selection_cache"
-    cache_dir.mkdir(parents=True, exist_ok=True)
+        cache_dir = Path(cfg.output_dir) / "selection_cache"
+        cache_dir.mkdir(parents=True, exist_ok=True)
 
-    for key in ("val_ds", "quantization_ds"):
-        source = dataloaders.get(key)
-        if source is None:
-            raise ValueError(f"Candidate selection requires {key}.")
+        for key in ("val_ds", "quantization_ds"):
+            source = dataloaders.get(key)
+            if source is None:
+                raise ValueError(f"Candidate selection requires {key}.")
 
-        frozen = source.cache(str(cache_dir / key))
-        batch_count = 0
+            frozen = source.cache(str(cache_dir / key))
+            batch_count = 0
 
-        # Exhaust the finite dataset to finish writing the cache.
-        for _ in frozen:
-            batch_count += 1
+            # Exhaust the finite dataset to finish writing the cache.
+            for _ in frozen:
+                batch_count += 1
 
-        if batch_count == 0:
-            raise ValueError(f"{key} is empty.")
+            if batch_count == 0:
+                raise ValueError(f"{key} is empty.")
 
-        dataloaders[key] = frozen
+            dataloaders[key] = frozen
 
     # Execute Services
     if mode == 'training':
@@ -143,21 +143,21 @@ def _process_mode(mode: str = None, cfg: DictConfig = None) -> None:
         trained_model = trainer.train()
         display_figures(cfg)
 
-	quantized_model = select_quantized_candidate(
-    		cfg=cfg,
-    		dataloaders=dataloaders,
-	)
+        quantized_model = select_quantized_candidate(
+            cfg=cfg,
+            dataloaders=dataloaders,
+        )
 
-	# Optional final test evaluation, only after validation-based selection.
-	if dataloaders.get("test_ds") is not None:
-   		evaluator = get_evaluator(
-        		cfg=cfg,
-        		model=quantized_model,
-        		dataloaders=dataloaders,
-    		)
-    		evaluator.evaluate()
+        # Optional final test evaluation, only after validation-based selection.
+        if dataloaders.get("test_ds") is not None:
+            evaluator = get_evaluator(
+                cfg=cfg,
+                model=quantized_model,
+                dataloaders=dataloaders,
+            )
+            evaluator.evaluate()
 
-	print("[INFO] : chain_tqe complete.")
+        print("[INFO] : chain_tqe complete.")
 
 #        evaluator = get_evaluator(cfg=cfg, 
 #                                  model=trained_model, 

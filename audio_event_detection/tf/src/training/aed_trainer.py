@@ -175,17 +175,17 @@ class AEDTrainer:
                               saved_models_dir=self.saved_models_dir,
                               logs_dir=cfg.general.logs_dir)
 
-	if cfg.operation_mode == "chain_tqe":
-    		self.callbacks.append(
-        		CandidateCheckpoints(
-            			directory=(
-                			Path(self.output_dir)
-                			/ self.saved_models_dir
-                			/ "candidates"
-            			),
-            			top_k=5,
-        		)
-    		)
+        if cfg.operation_mode == "chain_tqe":
+            self.callbacks.append(
+                CandidateCheckpoints(
+                    directory=(
+                        Path(self.output_dir)
+                        / self.saved_models_dir
+                        / "candidates"
+                    ),
+                    top_k=5,
+                )
+            )
         
         self._enable_determinism()
 
