@@ -45,7 +45,7 @@ preprocessing:
   time_shift_ms: 100
   background_noise_path: ../../datasets/speech_commands_v0.02/_background_noise_
   background_frequency: 0.8
-  background_volume: 0.4
+  background_volume: 0.8
   # These WAVs are used only to generate validation/test silence and are
   # excluded from online training augmentation and training silence.
   reserved_background_files: ['running_tap.wav']
@@ -147,7 +147,7 @@ data_augmentation:
 training:
   fine_tune: false
   dropout: 0.1 # Same rate 0.1 as PyTorch v03; Google's model default is 0.5.
-  batch_size: 400
+  batch_size: 200
   epochs: 200
   resume_training: null
   optimizer:
