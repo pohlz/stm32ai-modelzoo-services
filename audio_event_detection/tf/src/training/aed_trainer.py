@@ -15,7 +15,7 @@ from pathlib import Path
 from hydra.core.hydra_config import HydraConfig
 from munch import DefaultMunch
 from omegaconf import DictConfig
-from .candidate_checkpoints import CandidateCheckpoints
+from .candidate_checkpoint import CandidateCheckpoints
 import tensorflow as tf
 import logging
 
