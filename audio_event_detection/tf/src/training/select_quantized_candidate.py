@@ -89,12 +89,15 @@ def select_quantized_candidate(cfg, dataloaders):
             patch_accuracy, clip_accuracy = measured, None
 
         patch_accuracy = float(patch_accuracy)
-        if not math.isfinite(patch_accuracy):
+        merged_accuracy = float(evaluator.merged_patch_accuracy)
+        if not all(math.isfinite(value) for value in (patch_accuracy, merged_accuracy)):
             raise ValueError(f"Invalid accuracy for {candidate_id}.")
 
         results.append({
             **candidate,
             "quant_val_patch_accuracy": patch_accuracy,
+            "quant_val_merged_patch_accuracy": merged_accuracy,
+            "quant_val_merged_clip_accuracy": evaluator.merged_clip_accuracy,
             "quant_val_clip_accuracy": (
                 None if clip_accuracy is None else float(clip_accuracy)
             ),
@@ -105,8 +108,7 @@ def select_quantized_candidate(cfg, dataloaders):
 
     # Use full-precision scores; round only when displaying them.
     results.sort(key=lambda row: (
-        -row["quant_val_patch_accuracy"],
-        row["val_loss"],
+        -row["quant_val_merged_patch_accuracy"],
         row["epoch"],
     ))
 
@@ -133,21 +135,22 @@ def select_quantized_candidate(cfg, dataloaders):
 
     (export_root / "selection.json").write_text(
         json.dumps({
-            "criterion": "quantized validation patch accuracy",
-            "tie_breakers": ["float validation loss", "earlier epoch"],
+            "criterion": "quantized validation patch accuracy with silence/unknown merged after argmax",
+            "tie_breakers": ["earlier epoch"],
             "winner": winner,
             "final_model": str(final_path),
         }, indent=2),
         encoding="utf-8",
     )
 
-    print("\nEpoch | Float val acc | Float val loss | Quant val acc | Selected")
+    print("\nEpoch | Float val acc | Float val loss | Strict quant acc | Merged quant acc | Selected")
     for row in results:
         print(
             f"{row['epoch']:5d} | "
             f"{row['val_accuracy'] * 100:12.3f}% | "
             f"{row['val_loss']:14.6f} | "
             f"{row['quant_val_patch_accuracy'] * 100:12.3f}% | "
+            f"{row['quant_val_merged_patch_accuracy'] * 100:12.3f}% | "
             f"{'*' if row['selected'] else ''}"
         )
 
@@ -156,6 +159,10 @@ def select_quantized_candidate(cfg, dataloaders):
         winner["quant_val_patch_accuracy"] * 100,
     )
     mlflow.log_param("selected_checkpoint_epoch", winner["epoch"])
+    mlflow.log_metric(
+        "selected_quant_val_merged_patch_acc",
+        winner["quant_val_merged_patch_accuracy"] * 100,
+    )
 
     selected = tf.lite.Interpreter(model_path=str(final_path))
     selected.allocate_tensors()

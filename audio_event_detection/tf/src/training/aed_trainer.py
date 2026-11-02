@@ -16,6 +16,8 @@ from hydra.core.hydra_config import HydraConfig
 from munch import DefaultMunch
 from omegaconf import DictConfig
 from .candidate_checkpoint import CandidateCheckpoints
+from .merged_accuracy import MergedRejectionAccuracy
+from audio_event_detection.tf.src.utils.rejection_labels import rejection_indices
 import tensorflow as tf
 import logging
 
@@ -184,6 +186,7 @@ class AEDTrainer:
                         / "candidates"
                     ),
                     top_k=5,
+                    monitor="val_merged_rejection_accuracy",
                 )
             )
         
@@ -220,7 +223,8 @@ class AEDTrainer:
 
         checkpoint_model = tf.keras.models.load_model(
             checkpoint_filepath,
-            custom_objects=AED_CUSTOM_OBJECTS)
+            custom_objects=AED_CUSTOM_OBJECTS,
+            compile=False)
 
         # Get the checkpoint model w/o preprocessing layers
 
@@ -328,10 +332,16 @@ class AEDTrainer:
                set_all_layers_trainable_parameter(self.augmented_model, trainable=True)
 
 
+        metrics = ['accuracy']
+        if self.cfg.operation_mode == "chain_tqe":
+            metrics.append(MergedRejectionAccuracy(
+                rejection_indices=rejection_indices(self.cfg.dataset.class_names)
+            ))
+
         # Compile the model with data augmentation layers added
         self.augmented_model.compile(
             loss=get_loss(multi_label=self.cfg.dataset.multi_label),
-            metrics=['accuracy'],
+            metrics=metrics,
             optimizer=get_optimizer(cfg=self.cfg.training.optimizer)
             )
     

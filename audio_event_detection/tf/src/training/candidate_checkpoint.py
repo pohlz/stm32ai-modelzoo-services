@@ -8,11 +8,12 @@ import tensorflow as tf
 class CandidateCheckpoints(tf.keras.callbacks.Callback):
     """Retain top K accuracy checkpoints plus the minimum-loss checkpoint."""
 
-    def __init__(self, directory, top_k=5):
+    def __init__(self, directory, top_k=5, monitor="val_accuracy"):
         super().__init__()
         self.directory = Path(directory)
         self.directory.mkdir(parents=True, exist_ok=True)
         self.top_k = top_k
+        self.monitor = monitor
         self.top_accuracy = []
         self.best_loss = None
 
@@ -20,19 +21,22 @@ class CandidateCheckpoints(tf.keras.callbacks.Callback):
         logs = logs or {}
         accuracy = logs.get("val_accuracy")
         loss = logs.get("val_loss")
+        selection_accuracy = logs.get(self.monitor)
 
-        if accuracy is None or loss is None:
+        if accuracy is None or loss is None or selection_accuracy is None:
             raise ValueError(
-                "Candidate selection requires val_accuracy and val_loss."
+                f"Candidate selection requires val_accuracy, val_loss and {self.monitor}."
             )
 
         accuracy, loss = float(accuracy), float(loss)
-        if not math.isfinite(accuracy) or not math.isfinite(loss):
+        selection_accuracy = float(selection_accuracy)
+        if not all(math.isfinite(value) for value in (accuracy, loss, selection_accuracy)):
             raise ValueError("Non-finite validation metrics.")
 
         current = {
             "epoch": epoch + 1,
             "val_accuracy": accuracy,
+            "selection_accuracy": selection_accuracy,
             "val_loss": loss,
             "checkpoint": f"epoch_{epoch + 1:04d}.keras",
         }
@@ -44,7 +48,7 @@ class CandidateCheckpoints(tf.keras.callbacks.Callback):
         # Higher accuracy wins; ties keep the earlier epoch.
         self.top_accuracy = sorted(
             [*self.top_accuracy, current],
-            key=lambda row: (-row["val_accuracy"], row["epoch"]),
+            key=lambda row: (-row["selection_accuracy"], row["epoch"]),
         )[:self.top_k]
 
         if (
@@ -76,6 +80,7 @@ class CandidateCheckpoints(tf.keras.callbacks.Callback):
 
         manifest = {
             "top_k": self.top_k,
+            "monitor": self.monitor,
             "candidates": candidates,
         }
         temporary = self.directory / "manifest.tmp"

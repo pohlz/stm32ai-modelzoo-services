@@ -17,6 +17,7 @@ from omegaconf import DictConfig
 from common.utils import tf_dataset_to_np_array, plot_confusion_matrix, log_to_file, compute_confusion_matrix2
 from audio_event_detection.tf.src.preprocessing import preprocess_input
 from .base import BaseAEDEvaluator
+from audio_event_detection.tf.src.utils.rejection_labels import merged_rejection_accuracy
 warnings.filterwarnings("ignore")
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
@@ -147,6 +148,11 @@ class AEDTFliteEvaluator(BaseAEDEvaluator):
                                                     preds,
                                                     is_multilabel=self.multi_label)
 
+        self.merged_patch_accuracy = merged_rejection_accuracy(
+            patch_labels, preds, self.class_names
+        )
+        self.merged_clip_accuracy = None
+
         # Compute clip-level accuracy
         # Aggregate clip-level labels
         if self.clip_labels is not None:
@@ -161,7 +167,28 @@ class AEDTFliteEvaluator(BaseAEDEvaluator):
             clip_level_accuracy = self._compute_accuracy_score(aggregated_labels,
                                                         aggregated_preds,
                                                         is_multilabel=self.multi_label)
+            self.merged_clip_accuracy = merged_rejection_accuracy(
+                aggregated_labels, aggregated_preds, self.class_names
+            )
         # Print metrics & log in MLFlow
+
+        print(
+            "[INFO] : Patch-level accuracy (silence/unknown merged) = "
+            f"{self.merged_patch_accuracy * 100:.3f}%"
+        )
+        mlflow.log_metric(
+            f"quant_merged_patch_acc_{self.name_ds}",
+            self.merged_patch_accuracy * 100,
+        )
+        log_to_file(
+            self.output_dir,
+            f"Merged rejection patch accuracy : {self.merged_patch_accuracy * 100} %",
+        )
+        if self.merged_clip_accuracy is not None:
+            mlflow.log_metric(
+                f"quant_merged_clip_acc_{self.name_ds}",
+                self.merged_clip_accuracy * 100,
+            )
 
         print(f"[INFO] : Patch-level Accuracy of quantized model = {round(patch_level_accuracy * 100, 2)}%")
         if self.clip_labels is not None:
