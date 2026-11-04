@@ -21,12 +21,20 @@ try {
     if (-not (Test-Path -LiteralPath $runtime -PathType Container)) {
         throw "Matching STM32 AI middleware was not found: $runtime"
     }
-    $models = @(Get-ChildItem -LiteralPath $run -Recurse -File | Where-Object {
-        $_.Name -in @('quantize_model.tflite', 'quantized_model.tflite') -and
-        $_.FullName -notmatch '[\\/]NeuralART_compilation[^\\/]*[\\/]'
+    if ((Split-Path $run -Leaf) -eq 'quantized_models') {
+        $modelDirectory = $run
+        $run = Split-Path $run -Parent
+    } else {
+        $modelDirectory = Join-Path $run 'quantized_models'
+    }
+    if (-not (Test-Path -LiteralPath $modelDirectory -PathType Container)) {
+        throw "Quantized model folder does not exist: $modelDirectory"
+    }
+    $models = @(Get-ChildItem -LiteralPath $modelDirectory -File | Where-Object {
+        $_.Name -in @('quantize_model.tflite', 'quantized_model.tflite')
     })
     if ($models.Count -ne 1) {
-        throw "Expected exactly one quantize_model.tflite or quantized_model.tflite under $run; found $($models.Count). Pass a more specific folder."
+        throw "Expected exactly one quantize_model.tflite or quantized_model.tflite directly in $modelDirectory; found $($models.Count). Subfolders are not searched."
     }
     $out = Join-Path $run ('NeuralART_compilation_' + (Get-Date -Format 'yyyyMMdd_HHmmss_fff'))
     New-Item -ItemType Directory -Path $out -ErrorAction Stop | Out-Null

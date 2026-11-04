@@ -9,8 +9,12 @@ Example (from this script's directory):
 An experiment name is resolved under tf\src\experiments_outputs beside this
 script. A folder path is resolved relative to the current working directory.
 The memory-pool path is relative to the current working directory or absolute.
-Both quantize_model.tflite and quantized_model.tflite are accepted recursively;
-multiple matches cause an error instead of selecting a model arbitrarily.
+You may pass either the experiment folder or its quantized_models folder,
+including an experiment name ending in /quantized_models. Compilation output
+is always created under the experiment folder.
+Both quantize_model.tflite and quantized_model.tflite are accepted directly in
+the selected experiment's quantized_models folder. Subfolders and other experiment
+directories are not searched. Multiple matching files in that folder cause an error.
 
 Optional executable override:
 
