@@ -16,6 +16,7 @@ from hydra.core.hydra_config import HydraConfig
 from munch import DefaultMunch
 from omegaconf import DictConfig
 from .candidate_checkpoint import CandidateCheckpoints
+from .extra_validation import ExtraValidation
 from .merged_accuracy import MergedRejectionAccuracy
 from audio_event_detection.tf.src.utils.rejection_labels import rejection_indices
 import tensorflow as tf
@@ -34,7 +35,7 @@ logging.getLogger('tensorflow').setLevel(logging.ERROR)
 
 
 def _get_callbacks(callbacks_dict: DictConfig, output_dir: str = None, logs_dir: str = None,
-                  saved_models_dir: str = None) -> List[tf.keras.callbacks.Callback]:
+                  saved_models_dir: str = None, extra_val_ds=None) -> List[tf.keras.callbacks.Callback]:
     """
     This function creates the list of Keras callbacks to be passed to 
     the fit() function including:
@@ -123,6 +124,10 @@ def _get_callbacks(callbacks_dict: DictConfig, output_dir: str = None, logs_dir:
                         mode="max")
     callback_list.append(callback)
 
+    # Report extra sets before loggers/history; primary monitors are unchanged.
+    if extra_val_ds:
+        callback_list.append(ExtraValidation(extra_val_ds))
+
     # Add the TensorBoard callback
     callback = LRTensorBoard(log_dir=os.path.join(output_dir, logs_dir))
     callback_list.append(callback)
@@ -159,6 +164,7 @@ class AEDTrainer:
         self.train_ds = dataloaders['train_ds']
 
         self.val_ds = dataloaders['val_ds']
+        self.extra_val_ds = dataloaders.get('extra_val_ds', {})
         self.val_clip_labels = dataloaders['val_clip_labels']
 
         self.output_dir = HydraConfig.get().runtime.output_dir
@@ -175,7 +181,8 @@ class AEDTrainer:
         self.callbacks = _get_callbacks(callbacks_dict=cfg.training.callbacks,
                               output_dir=self.output_dir,
                               saved_models_dir=self.saved_models_dir,
-                              logs_dir=cfg.general.logs_dir)
+                              logs_dir=cfg.general.logs_dir,
+                              extra_val_ds=self.extra_val_ds)
 
         if cfg.operation_mode == "chain_tqe":
             self.callbacks.append(

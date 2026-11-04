@@ -341,7 +341,8 @@ class BaseAEDTFDataset:
                    shuffle: bool,
                    return_clip_labels: bool,
                    split_name: str,
-                   df=None):
+                   df=None,
+                   external_evaluation: bool = False):
         """Build a lazy GSC dataset with per-iteration waveform augmentation.
 
         Unlike :meth:`get_ds`, this method keeps file paths in the TensorFlow
@@ -367,7 +368,9 @@ class BaseAEDTFDataset:
             )
 
         dataframe = dataframe[dataframe["category"].isin(used_classes)].reset_index(drop=True)
-        self.time_pipeline.validate_silence_sources(dataframe, split_name)
+        self.time_pipeline.validate_silence_sources(
+            dataframe, split_name, external_evaluation=external_evaluation
+        )
 
         class_names = sorted(used_classes)
         class_to_index = {name: index for index, name in enumerate(class_names)}

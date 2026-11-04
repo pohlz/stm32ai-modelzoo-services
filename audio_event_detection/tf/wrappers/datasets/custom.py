@@ -27,7 +27,8 @@ def get_custom(cfg):
     -------
     dict
         Dictionary with keys: `train_ds`, `val_ds`, `quantization_ds`, `test_ds`,
-        `val_clip_labels`, `test_clip_labels`, `pred_ds`, `pred_clip_labels`, `pred_filenames`.
+        `val_clip_labels`, `test_clip_labels`, `pred_ds`, `pred_clip_labels`, `pred_filenames`,
+        and optional named reporting-only datasets in `extra_val_ds`.
     """
 
     time_pipeline, freq_pipeline = get_pipelines(cfg)
@@ -72,6 +73,7 @@ def get_custom(cfg):
         validation_csv_path=validation_csv_path,
         validation_audio_path=validation_audio_path,
         validation_split=validation_split,
+        extra_validation_sets=cfg.dataset.get("extra_validation_sets") if cfg.training else None,
         quantization_csv_path=quantization_csv_path,
         quantization_audio_path=quantization_audio_path,
         test_csv_path=test_csv_path,

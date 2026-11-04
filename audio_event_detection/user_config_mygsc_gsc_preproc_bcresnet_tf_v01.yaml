@@ -25,6 +25,17 @@ dataset:
   training_csv_path: ../../datasets/speech_commands_v0.02/training.csv
   validation_audio_path: ../../datasets/speech_commands_v0.02
   validation_csv_path: ../../datasets/speech_commands_v0.02/validation.csv
+  # Reporting only: primary validation continues to control training/checkpoints.
+  # CSV filenames already contain validation_*db/, so use the same audio root.
+  extra_validation_sets:
+    noise_0db:
+      csv_path: ../../datasets/speech_commands_v0.02/validation_0db.csv
+    noise_5db:
+      csv_path: ../../datasets/speech_commands_v0.02/validation_5db.csv
+    noise_10db:
+      csv_path: ../../datasets/speech_commands_v0.02/validation_10db.csv
+    noise_30db:
+      csv_path: ../../datasets/speech_commands_v0.02/validation_30db.csv
   quantization_audio_path: ../../datasets/speech_commands_v0.02
   quantization_csv_path: ../../datasets/speech_commands_v0.02/quantization.csv
   test_audio_path: null

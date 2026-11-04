@@ -41,7 +41,8 @@ class CustomAEDTFDataset(BaseAEDTFDataset):
                  file_extension: str = ".wav",
                  n_samples_per_garbage_class: int = None,
                  expand_last_dim: bool = True,
-                 seed: int = 133):
+                 seed: int = 133,
+                 extra_validation_sets=None):
         """
         Initialize the custom AED dataset.
 
@@ -109,6 +110,7 @@ class CustomAEDTFDataset(BaseAEDTFDataset):
             expand_last_dim=expand_last_dim,
             seed=seed)
         
+        self.extra_validation_sets = extra_validation_sets or {}
         self.class_names = class_names
         self.quantization_split = quantization_split
         self.gsc_default = getattr(self.time_pipeline, "gsc_default", False)
@@ -136,6 +138,7 @@ class CustomAEDTFDataset(BaseAEDTFDataset):
             Dictionary containing the following keys:
             - `train_ds`: tf.data.Dataset or None
             - `val_ds`: tf.data.Dataset or None
+            - `extra_val_ds`: named reporting-only validation datasets
             - `quantization_ds`: tf.data.Dataset or None
             - `test_ds`: tf.data.Dataset or None
             - `val_clip_labels`: np.ndarray or None
@@ -325,7 +328,33 @@ class CustomAEDTFDataset(BaseAEDTFDataset):
             pred_clip_labels = None
             pred_filenames = None
 
-        out_dict = {"train_ds":train_ds,
+        extra_val_ds = {}
+        for name, spec in self.extra_validation_sets.items():
+            frame = pd.read_csv(spec["csv_path"])
+            if frame.empty or not {"filename", "category"}.issubset(frame.columns):
+                raise ValueError(f"Invalid extra validation CSV for {name}")
+            if frame[["filename", "category"]].isna().any().any():
+                raise ValueError(f"Missing filename/category in extra validation {name}")
+            if set(frame["category"]) != set(self.class_names):
+                raise ValueError(f"Class labels differ from primary validation for {name}")
+            audio_path = spec.get("audio_path") or self.validation_audio_path or self.training_audio_path
+            print(f"[INFO] : Loading reporting-only validation {name}: {len(frame)} samples")
+            if self.gsc_default:
+                extra_val_ds[name] = self.get_gsc_ds(
+                    df=frame, audio_path=audio_path, used_classes=self.class_names,
+                    batch_size=batch_size, to_cache=to_cache, shuffle=False,
+                    return_clip_labels=False, split_name=f"extra_validation_{name}",
+                    external_evaluation=True,
+                )
+            else:
+                extra_val_ds[name] = self.get_ds(
+                    df=frame, audio_path=audio_path, used_classes=self.class_names,
+                    batch_size=batch_size, to_cache=to_cache, shuffle=False,
+                    return_clip_labels=False, return_arrays=False,
+                )
+
+        out_dict = {"extra_val_ds": extra_val_ds,
+                    "train_ds":train_ds,
                     "val_ds":val_ds,
                     "quantization_ds":quantization_ds,
                     "test_ds":test_ds,

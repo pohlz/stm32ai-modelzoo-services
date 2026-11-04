@@ -29,7 +29,7 @@ def _parse_dataset_section(cfg: DictConfig, mode: str = None, mode_groups: DictC
              "expand_last_dim", "file_extension", "to_cache", "shuffle", "batch_size",  "class_names",
              "classes_file_path", "validation_audio_path", "validation_csv_path", "validation_split",
              "test_audio_path", "test_csv_path", "quantization_audio_path", "quantization_csv_path", "prediction_audio_path",
-             "quantization_split", "n_samples_per_garbage_class", "seed"]
+             "quantization_split", "n_samples_per_garbage_class", "seed", "extra_validation_sets"]
 
     required = ["dataset_name", "multi_label", "use_garbage_class", "file_extension",
                 "to_cache", "shuffle", "n_samples_per_garbage_class", "seed"]
@@ -58,6 +58,30 @@ def _parse_dataset_section(cfg: DictConfig, mode: str = None, mode_groups: DictC
             print("[INFO] : Found {} classes in label file {}".format(len(cfg.class_names), cfg.classes_file_path))
         cfg.class_names = sorted(cfg.class_names)    
         cfg.num_classes = len(cfg.class_names) if cfg.class_names else None
+
+    # Additional sets are reporting-only and never replace primary validation.
+    extra_sets = cfg.get("extra_validation_sets") or {}
+    if not isinstance(extra_sets, (dict, DictConfig)):
+        raise ValueError("dataset.extra_validation_sets must be a named mapping")
+    for name, spec in extra_sets.items():
+        if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", str(name)):
+            raise ValueError(f"Invalid extra validation name: {name!r}")
+        if not isinstance(spec, (dict, DictConfig)) or not spec.get("csv_path"):
+            raise ValueError(f"Extra validation {name!r} requires csv_path")
+        unknown = set(spec) - {"csv_path", "audio_path"}
+        if unknown:
+            raise ValueError(f"Unknown extra validation options for {name}: {unknown}")
+        audio_path = spec.get("audio_path") or cfg.validation_audio_path or cfg.training_audio_path
+        if not audio_path or not os.path.isdir(audio_path):
+            raise FileNotFoundError(f"Invalid extra validation audio directory: {audio_path}")
+        if not os.path.isfile(spec["csv_path"]):
+            raise FileNotFoundError(f"Missing extra validation CSV: {spec['csv_path']}")
+        frame = pd.read_csv(spec["csv_path"])
+        if frame.empty or not {"filename", "category"}.issubset(frame.columns):
+            raise ValueError(f"Extra validation {name!r} requires nonempty filename/category columns")
+        if frame[["filename", "category"]].isna().any().any():
+            raise ValueError(f"Missing filename/category in extra validation {name!r}")
+    cfg.extra_validation_sets = extra_sets
 
     # Set default values of missing optional attributes
     if not cfg.dataset_name:

@@ -213,8 +213,17 @@ class GSCWaveformPipeline:
             sources.add(match.group(1))
         return sources
 
-    def validate_silence_sources(self, dataframe: pd.DataFrame, split_name: str) -> None:
+    def validate_silence_sources(self, dataframe: pd.DataFrame, split_name: str,
+                                 external_evaluation: bool = False) -> None:
         """Reject source leakage between training and validation/test silence rows."""
+        if external_evaluation:
+            if not split_name.startswith("extra_validation_"):
+                raise ValueError("External silence is allowed only for extra validation")
+            if not (dataframe["category"] == "silence").any():
+                raise ValueError(f"External evaluation {split_name!r} has no silence rows")
+            # External noise-only WAVs have no original GSC filename provenance.
+            # get_gsc_ds still checks file existence, classes, and feature shape.
+            return
         sources = self.silence_sources(dataframe)
         if not sources:
             raise ValueError(f"GSC split {split_name!r} has no silence examples")
