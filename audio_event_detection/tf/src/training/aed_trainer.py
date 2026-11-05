@@ -210,7 +210,11 @@ class AEDTrainer:
         """
         self._fit()
         # Visualize training curves
-        vis_training_curves(history=self.history, output_dir=self.output_dir)
+        vis_training_curves(
+            history=self.history, output_dir=self.output_dir,
+            metrics_csv_path=Path(self.output_dir) / self.cfg.general.logs_dir
+            / "metrics" / "train_metrics.csv",
+        )
         self._save_checkpoints()
         print("[INFO] : Training complete.")
         return self.best_model
@@ -261,6 +265,17 @@ class AEDTrainer:
                                         steps_per_epoch=steps_per_epoch,
                                         callbacks=self.callbacks)
     
+        # Some Keras versions isolate logs passed to History from mutations in
+        # user callbacks. Merge the extra metrics explicitly after fit as well.
+        for callback in self.callbacks:
+            if isinstance(callback, ExtraValidation) and callback.epoch_metrics:
+                keys = next(iter(callback.epoch_metrics.values())).keys()
+                for key in keys:
+                    self.history.history[key] = [
+                        callback.epoch_metrics[epoch][key]
+                        for epoch in self.history.epoch
+                    ]
+
         #save the last epoch history in the log file
         last_epoch=log_last_epoch_history(self.cfg, self.output_dir)
         end_time = timer()

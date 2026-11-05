@@ -14,11 +14,15 @@ class ExtraValidation(tf.keras.callbacks.Callback):
     def __init__(self, datasets):
         super().__init__()
         self.datasets = datasets
+        self.epoch_metrics = {}
         self.loss_fn = tf.keras.losses.CategoricalCrossentropy(
             from_logits=False, reduction="none"
         )
         self.loss_metric = tf.keras.metrics.Mean()
         self.accuracy_metric = tf.keras.metrics.CategoricalAccuracy()
+
+    def on_train_begin(self, logs=None):
+        self.epoch_metrics.clear()
 
     def on_epoch_end(self, epoch, logs=None):
         if logs is None:
@@ -41,6 +45,10 @@ class ExtraValidation(tf.keras.callbacks.Callback):
             prefix = f"val_{name}"
             logs[f"{prefix}_loss"] = float(self.loss_metric.result().numpy())
             logs[f"{prefix}_accuracy"] = float(self.accuracy_metric.result().numpy())
+            self.epoch_metrics.setdefault(epoch, {}).update({
+                f"{prefix}_loss": logs[f"{prefix}_loss"],
+                f"{prefix}_accuracy": logs[f"{prefix}_accuracy"],
+            })
             print(
                 f"[INFO] : Epoch {epoch + 1} {name}: "
                 f"loss={logs[f'{prefix}_loss']:.5f}, "
