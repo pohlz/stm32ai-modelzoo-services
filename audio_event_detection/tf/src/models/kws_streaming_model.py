@@ -10,8 +10,51 @@ kws_streaming/upstream/. See docs/README_BCRESNET_TF.md for adaptation details.
 """
 
 import tensorflow as tf
-import numpy as np
 from tensorflow.keras import layers
+
+
+@tf.keras.utils.register_keras_serializable(package="BCResNet")
+class TemporalKernelMask(tf.keras.constraints.Constraint):
+    """Keep the inserted taps zero after every optimizer update."""
+
+    def __init__(self, dilation):
+        self.dilation = int(dilation)
+
+    def __call__(self, weights):
+        mask = tf.equal(tf.range(tf.shape(weights)[0]) % self.dilation, 0)
+        return weights * tf.cast(mask[:, None, None, None], weights.dtype)
+
+    def get_config(self):
+        return {"dilation": self.dilation}
+
+
+@tf.keras.utils.register_keras_serializable(package="BCResNet")
+class ExpandedTemporalInitializer(tf.keras.initializers.Initializer):
+    """Initialize three learned taps, inserting exact zeros between them."""
+
+    def __init__(self, dilation):
+        self.dilation = int(dilation)
+
+    def __call__(self, shape, dtype=None):
+        compact = tf.keras.initializers.GlorotUniform()((3,) + tuple(shape[1:]), dtype=dtype)
+        return tf.scatter_nd([[0], [self.dilation], [2 * self.dilation]], compact, shape)
+
+    def get_config(self):
+        return {"dilation": self.dilation}
+
+
+def _temporal_depthwise(x, dilation, name):
+    """Use ordinary convolution so export does not need space/batch transforms."""
+    rate, frequency_rate = dilation
+    if frequency_rate != 1:
+        raise ValueError("Only temporal dilation is supported")
+    options = {}
+    if rate > 1:
+        options = dict(depthwise_initializer=ExpandedTemporalInitializer(rate),
+                       depthwise_constraint=TemporalKernelMask(rate))
+    return layers.DepthwiseConv2D(
+        (2 * rate + 1, 1), dilation_rate=(1, 1), padding="same",
+        use_bias=False, name=name, **options)(x)
 
 
 def _ssn(x, name, groups=5):
@@ -51,8 +94,7 @@ def _block(x, filters, dilation, stride, dropout, name, transition):
     )(x)
 
 #   End of averagepooling2d replacement
-    x = layers.DepthwiseConv2D((3, 1), dilation_rate=dilation, padding="same",
-                               use_bias=False, name=name + "_temporal_dw")(x)
+    x = _temporal_depthwise(x, dilation, name + "_temporal_dw")
     x = layers.BatchNormalization(name=name + "_temporal_bn")(x)
     x = layers.Activation("swish", name=name + "_swish")(x)
     x = layers.Conv2D(filters, 1, padding="valid" if transition else "same",

@@ -62,7 +62,10 @@ Individual services are selected with `operation_mode=training`,
 ## Architecture and adaptation
 
 `kws_streaming_model.py` expresses the upstream non-streaming graph with built-in
-functional Keras layers, so save/reload needs no custom objects or Lambda layers.
+functional Keras layers. Expanded temporal kernels use registered initializer
+and constraint classes: import `kws_streaming_model` before loading a saved Keras
+model in a standalone script (the normal custom-model hook imports it already).
+No custom inference operators or Lambda layers are needed.
 It uses externally computed log-mel features instead of Google's raw-audio
 frontend. The input adapter permutes STM `[N, frequency, time, 1]` to Google's
 `[N, time, frequency, 1]`; the output is softmax for STM's categorical loss.
@@ -71,6 +74,15 @@ this PTQ integration; installing the whole `kws_streaming` package is unnecessar
 
 The implementation preserves Google's default stage widths `[8,12,16,20]`,
 dilations `[(1,1),(2,1),(3,1),(3,1)]`, and frequency strides `[1,2,2,1]`.
+Temporal dilation is implemented by ordinary depthwise kernels with inserted
+zeros: stage 1 uses 3x1, stage 2 uses 5x1 with taps `[a,0,b,0,c]`, and stages
+3/4 use 7x1 with taps `[a,0,0,b,0,0,c]`. All runtime dilation rates are 1.
+The initializer draws the original three taps; a constraint keeps the inserted
+taps zero after optimizer updates. This preserves the original receptive fields
+and removes the need for SpaceToBatch/BatchToSpace in TFLite export. There are
+13 expanded kernels (three 5x1 and ten 7x1). Existing saved models are unchanged;
+training from scratch through the custom hook selects this implementation.
+NPU mapping and latency must still be checked after quantization and compilation.
 Upstream `blocks_n=[2,2,4,4]` counts normal blocks **in addition to** one transition
 per stage: 16 blocks total. Its stem has bias and no BN/activation; its final
 depthwise classifier uses SAME padding and no intermediate BN/activation.
