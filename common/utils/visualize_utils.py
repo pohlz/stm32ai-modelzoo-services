@@ -19,31 +19,61 @@ from PIL import Image
 from typing import Dict
 
 
-def vis_training_curves(history=None, output_dir: str = None) -> None:
+def vis_training_curves(history=None, output_dir: str = None, metrics_csv_path=None) -> None:
     """
     Visualizes the training curves of the model.
 
     Args:
         history: The history object returned by the model.fit() method.
         output_dir (Optional[str]): The output directory to save the training curves plot.
+        metrics_csv_path: Optional CSVLogger file. Uses saved metrics, including
+            callback metrics that some Keras versions omit from History.
 
     Returns:
         None
     """
+    if metrics_csv_path is not None:
+        metrics_frame = pd.read_csv(metrics_csv_path)
+        metrics = metrics_frame.to_dict(orient="list")
+        epochs_range = metrics_frame['epoch'].tolist()
+    else:
+        metrics = history.history
+        epochs_range = getattr(history, 'epoch', range(len(metrics['accuracy'])))
     # Extract the accuracy and loss values for training and validation data
-    acc = history.history['accuracy']
-    val_acc = history.history['val_accuracy']
-    loss = history.history['loss']
-    val_loss = history.history['val_loss']
-    epochs_range = range(len(acc))
+    acc = metrics['accuracy']
+    val_acc = metrics['val_accuracy']
+    loss = metrics['loss']
+    val_loss = metrics['val_loss']
 
     # Create dataframes for the training and validation data
     df_val = pd.DataFrame(
         {'run': 'validation', 'step': epochs_range, 'epoch_accuracy': val_acc, 'epoch_loss': val_loss})
     df_train = pd.DataFrame({'run': 'train', 'step': epochs_range, 'epoch_accuracy': acc, 'epoch_loss': loss})
 
-    # Concatenate the dataframes
+    # Optional reporting-only validation series; old histories still work.
     frames = [df_val, df_train]
+    extra_keys = [key for key in metrics if key.startswith("val_") and key.endswith("_accuracy")]
+    # Keep SNRs in numeric order rather than CSVLogger's alphabetical ordering.
+    extra_keys.sort(key=lambda key: (
+        int(key[len('val_noise_'):-len('db_accuracy')])
+        if key.startswith('val_noise_') and key.endswith('db_accuracy')
+        and key[len('val_noise_'):-len('db_accuracy')].isdigit() else float('inf'), key
+    ))
+    for key in extra_keys:
+        if key == "val_accuracy":
+            continue
+        if not key.startswith("val_") or not key.endswith("_accuracy"):
+            continue
+        prefix = key[:-len("_accuracy")]
+        loss_key = prefix + "_loss"
+        if loss_key not in metrics:
+            continue
+        label = prefix[len("val_"):].replace("_", " ")
+        frames.append(pd.DataFrame({
+            'run': label, 'step': epochs_range,
+            'epoch_accuracy': metrics[key],
+            'epoch_loss': metrics[loss_key],
+        }))
     df = pd.concat(frames)
     df = df.reset_index()
 
@@ -55,7 +85,9 @@ def vis_training_curves(history=None, output_dir: str = None) -> None:
     plt.subplot(1, 2, 2)
     sns.lineplot(data=df, x="step", y="epoch_loss", hue="run").set_title("loss")
     plt.grid()
+    plt.tight_layout()
     plt.savefig(os.path.join(output_dir, 'Training_curves.png'))
+    plt.close()
     
 
 def plot_confusion_matrix(cm: np.ndarray = None,
