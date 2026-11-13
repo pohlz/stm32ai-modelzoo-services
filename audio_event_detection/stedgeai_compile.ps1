@@ -47,9 +47,12 @@ try {
     } } } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $profile -Encoding ASCII
     $generated = Join-Path $out 'generated'
     $workspace = Join-Path $out 'workspace'
-    $cliArgs = @('generate', '--model', $models[0].FullName, '--target', 'stm32n6',
+    $cliArgs = @('generate', '--model', $models[0].FullName, '--enable-epoch-controller', '--target', 'stm32n6',
         '--name', 'network', '--c-api', 'st-ai', '--st-neural-art', "manual@$profile",
         '--optimization', 'balanced', '--output', $generated, '--workspace', $workspace)
+#    $cliArgs = @('generate', '--model', $models[0].FullName, '--target', 'stm32n6',
+#        '--name', 'network', '--c-api', 'st-ai', '--st-neural-art', "manual@$profile",
+#        '--optimization', 'balanced', '--output', $generated, '--workspace', $workspace)
     @{ executable=$exe; arguments=$cliArgs; model=$models[0].FullName; memory_pool=$pool } |
         ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $out 'command.json') -Encoding UTF8
     Write-Host "Compiling: $($models[0].FullName)"

@@ -53,6 +53,7 @@ set +e
   --optimization balanced \
   --output "$analysis_windows" \
   --workspace "$analysis_windows" \
+  --enable-epoch-controller \
   2>&1 | tee "$analysis_dir/stedgeai_analyze.log"
 status=${PIPESTATUS[0]}
 set -e
